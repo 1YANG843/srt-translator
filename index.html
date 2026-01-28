@@ -656,6 +656,9 @@ ${texts}`
             addLog(`拖入了 ${items.length} 个项目`, 'info');
             document.getElementById('statusText').textContent = '正在检测文件...';
             
+            // 收集所有文件夹名称
+            let folderNames = [];
+            
             for (let i = 0; i < items.length; i++) {
                 const item = items[i];
                 if (item.kind === 'file') {
@@ -663,11 +666,13 @@ ${texts}`
                     if (item.getAsFileSystemHandle) {
                         const handle = await item.getAsFileSystemHandle();
                         if (handle.kind === 'directory') {
-                            rootHandle = handle;
-                            document.getElementById('folderName').textContent = handle.name;
-                            document.getElementById('folderPath').style.display = 'block';
-                            addLog(`已选择文件夹: ${handle.name}`, 'success');
-                            await scanDirectory(handle, '', filterChinese);
+                            // 支持多个文件夹：不覆盖 rootHandle，而是扫描每个文件夹
+                            if (!rootHandle) {
+                                rootHandle = handle; // 只设置第一个作为根
+                            }
+                            folderNames.push(handle.name);
+                            addLog(`扫描文件夹: ${handle.name}`, 'success');
+                            await scanDirectory(handle, handle.name + '/', filterChinese);
                         } else if (handle.kind === 'file' && handle.name.toLowerCase().endsWith('.srt')) {
                             // 检测多种中文标记
                             const lowerName = handle.name.toLowerCase();
@@ -747,6 +752,14 @@ ${texts}`
                         }
                     }
                 }
+            }
+            
+            // 更新文件夹显示
+            if (folderNames.length > 0) {
+                document.getElementById('folderName').textContent = folderNames.length === 1
+                    ? folderNames[0]
+                    : `${folderNames.length} 个文件夹: ${folderNames.join(', ')}`;
+                document.getElementById('folderPath').style.display = 'block';
             }
             
             updateFileList();
