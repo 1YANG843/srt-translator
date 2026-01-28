@@ -606,10 +606,14 @@ ${texts}`
         
         dropArea.addEventListener('drop', async (e) => {
             e.preventDefault();
+            e.stopPropagation();
             dropArea.style.borderColor = 'rgba(0, 212, 255, 0.5)';
             dropArea.style.background = 'transparent';
             
+            addLog('检测到拖拽事件...', 'info');
+            
             files = [];
+            rootHandle = null; // 重置 rootHandle
             scanStats = { total: 0, skipped: 0, added: 0 };
             const items = e.dataTransfer.items;
             const filterByName = document.getElementById('filterByName').checked;
@@ -617,76 +621,88 @@ ${texts}`
             addLog(`拖入了 ${items.length} 个项目`, 'info');
             document.getElementById('statusText').textContent = '正在检测文件...';
             
-            // 收集所有文件夹名称
-            let folderNames = [];
+            // 关键修复：先同步收集所有 handles（因为 DataTransferItemList 在异步后会失效）
+            const handlePromises = [];
+            const fallbackFiles = [];
             
             for (let i = 0; i < items.length; i++) {
                 const item = items[i];
                 if (item.kind === 'file') {
-                    // 尝试获取文件系统句柄（用于保存）
                     if (item.getAsFileSystemHandle) {
-                        const handle = await item.getAsFileSystemHandle();
-                        if (handle.kind === 'directory') {
-                            // 支持多个文件夹：不覆盖 rootHandle，而是扫描每个文件夹
-                            if (!rootHandle) {
-                                rootHandle = handle; // 只设置第一个作为根
-                            }
-                            folderNames.push(handle.name);
-                            addLog(`扫描文件夹: ${handle.name}`, 'success');
-                            await scanDirectory(handle, handle.name + '/', filterByName);
-                        } else if (handle.kind === 'file' && handle.name.toLowerCase().endsWith('.srt')) {
-                            // 跳过已翻译的文件（带 _中文 后缀的）
-                            const isTranslatedFile = handle.name.includes('_中文');
-                            if (!isTranslatedFile) {
-                                scanStats.total++;
-                                document.getElementById('statusText').textContent = `正在检测... 已检测 ${scanStats.total} 个文件`;
-                                
-                                // 只翻译文件名含"日语"或"韩语"的文件
-                                if (filterByName && !shouldTranslate(handle.name)) {
-                                    scanStats.skipped++;
-                                    addLog(`跳过: ${handle.name}（文件名不含日语/韩语）`, 'warning');
-                                    continue;
-                                }
-                                
-                                files.push({
-                                    handle: handle,
-                                    dirHandle: null,
-                                    path: '',
-                                    name: handle.name,
-                                    status: 'pending'
-                                });
-                                scanStats.added++;
-                                addLog(`添加文件: ${handle.name}`, 'success');
-                            }
-                        }
+                        // 同步启动所有 Promise
+                        handlePromises.push(item.getAsFileSystemHandle());
                     } else {
-                        // 降级：只能读取文件，不能保存到原位置
+                        // 降级：同步获取文件
                         const file = item.getAsFile();
-                        // 跳过已翻译的文件（带 _中文 后缀的）
-                        const isTranslatedFile2 = file && file.name.includes('_中文');
-                        if (file && file.name.toLowerCase().endsWith('.srt') && !isTranslatedFile2) {
-                            scanStats.total++;
-                            document.getElementById('statusText').textContent = `正在检测... 已检测 ${scanStats.total} 个文件`;
-                            
-                            // 只翻译文件名含"日语"或"韩语"的文件
-                            if (filterByName && !shouldTranslate(file.name)) {
-                                scanStats.skipped++;
-                                addLog(`跳过: ${file.name}（文件名不含日语/韩语）`, 'warning');
-                                continue;
-                            }
-                            
-                            files.push({
-                                handle: null,
-                                file: file,
-                                dirHandle: null,
-                                path: '',
-                                name: file.name,
-                                status: 'pending'
-                            });
-                            scanStats.added++;
-                            addLog(`添加文件(只读): ${file.name}`, 'warning');
-                        }
+                        if (file) fallbackFiles.push(file);
                     }
+                }
+            }
+            
+            // 等待所有 handles
+            const handles = await Promise.all(handlePromises);
+            addLog(`获取到 ${handles.length} 个文件系统句柄`, 'info');
+            
+            // 收集所有文件夹名称
+            let folderNames = [];
+            
+            // 处理 handles
+            for (const handle of handles) {
+                if (handle.kind === 'directory') {
+                    if (!rootHandle) {
+                        rootHandle = handle;
+                    }
+                    folderNames.push(handle.name);
+                    addLog(`扫描文件夹: ${handle.name}`, 'success');
+                    await scanDirectory(handle, handle.name + '/', filterByName);
+                } else if (handle.kind === 'file' && handle.name.toLowerCase().endsWith('.srt')) {
+                    const isTranslatedFile = handle.name.includes('_中文');
+                    if (!isTranslatedFile) {
+                        scanStats.total++;
+                        document.getElementById('statusText').textContent = `正在检测... 已检测 ${scanStats.total} 个文件`;
+                        
+                        if (filterByName && !shouldTranslate(handle.name)) {
+                            scanStats.skipped++;
+                            addLog(`跳过: ${handle.name}（文件名不含日语/韩语）`, 'warning');
+                            continue;
+                        }
+                        
+                        files.push({
+                            handle: handle,
+                            dirHandle: null,
+                            path: '',
+                            name: handle.name,
+                            status: 'pending'
+                        });
+                        scanStats.added++;
+                        addLog(`添加文件: ${handle.name}`, 'success');
+                    }
+                }
+            }
+            
+            // 处理降级文件
+            for (const file of fallbackFiles) {
+                const isTranslatedFile = file.name.includes('_中文');
+                if (file.name.toLowerCase().endsWith('.srt') && !isTranslatedFile) {
+                    scanStats.total++;
+                    document.getElementById('statusText').textContent = `正在检测... 已检测 ${scanStats.total} 个文件`;
+                    
+                    if (filterByName && !shouldTranslate(file.name)) {
+                        scanStats.skipped++;
+                        addLog(`跳过: ${file.name}（文件名不含日语/韩语）`, 'warning');
+                        continue;
+                    }
+                    
+                    files.push({
+                        handle: null,
+                        file: file,
+                        dirHandle: null,
+                        path: '',
+                        name: file.name,
+                        status: 'pending'
+                    });
+                    scanStats.added++;
+                    addLog(`添加文件(只读): ${file.name}`, 'warning');
                 }
             }
             
