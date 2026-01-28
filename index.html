@@ -643,12 +643,22 @@ ${texts}`
             const handles = await Promise.all(handlePromises);
             addLog(`获取到 ${handles.length} 个文件系统句柄`, 'info');
             
+            // 调试：显示每个 handle 的信息
+            for (let i = 0; i < handles.length; i++) {
+                const h = handles[i];
+                if (h) {
+                    addLog(`句柄 ${i+1}: ${h.kind} - ${h.name}`, 'info');
+                } else {
+                    addLog(`句柄 ${i+1}: null`, 'warning');
+                }
+            }
+            
             // 收集所有文件夹名称
             let folderNames = [];
             
             // 处理 handles
             for (const handle of handles) {
-                if (handle.kind === 'directory') {
+                if (handle && handle.kind === 'directory') {
                     if (!rootHandle) {
                         rootHandle = handle;
                     }
