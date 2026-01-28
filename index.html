@@ -201,8 +201,8 @@
             <p style="color: #aaa; margin-bottom: 15px;">选择包含SRT字幕文件的文件夹，翻译后的文件将自动保存到同一位置</p>
             
             <div style="border: 2px dashed rgba(0, 212, 255, 0.5); border-radius: 10px; padding: 30px; text-align: center; margin-bottom: 15px; cursor: pointer;" id="dropArea" onclick="selectFolder()">
-                <p style="font-size: 18px; color: #00d4ff;">📂 点击选择文件夹</p>
-                <p style="color: #888; margin-top: 10px;">或拖拽SRT文件到此处</p>
+                <p style="font-size: 18px; color: #00d4ff;">📂 点击选择文件夹（推荐，可自动保存）</p>
+                <p style="color: #888; margin-top: 10px;">或拖拽文件夹到此处（翻译后下载）</p>
             </div>
             
             <div id="folderPath" style="display: none;">
@@ -409,6 +409,26 @@
             document.getElementById('startBtn').style.display = 'none';
             document.getElementById('stopBtn').style.display = 'inline-block';
             
+            // 收集所有需要权限的文件夹，一次性请求
+            const dirHandles = new Set();
+            for (const f of files) {
+                if (f.dirHandle) {
+                    dirHandles.add(f.dirHandle);
+                }
+            }
+            
+            // 一次性请求所有文件夹的写入权限
+            if (dirHandles.size > 0) {
+                addLog(`请求 ${dirHandles.size} 个文件夹的写入权限...`, 'info');
+                for (const dirHandle of dirHandles) {
+                    try {
+                        await dirHandle.requestPermission({ mode: 'readwrite' });
+                    } catch (e) {
+                        addLog(`权限请求失败: ${dirHandle.name}`, 'warning');
+                    }
+                }
+            }
+            
             addLog('开始批量翻译...', 'info');
             
             for (let i = 0; i < files.length; i++) {
@@ -453,7 +473,7 @@
                             f.status = 'completed';
                             addLog(`✓ 已保存: ${f.path}${newName}`, 'success');
                         } catch (saveErr) {
-                            addLog(`保存失败，改为下载: ${saveErr.message}`, 'warning');
+                            addLog(`保存失败: ${saveErr.message}`, 'warning');
                         }
                     }
                     
