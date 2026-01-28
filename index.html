@@ -196,11 +196,14 @@
             </div>
         </div>
         
-        <div class="panel">
+        <div class="panel" id="dropZone">
             <div class="panel-title">📁 选择文件夹</div>
             <p style="color: #aaa; margin-bottom: 15px;">选择包含SRT字幕文件的文件夹，翻译后的文件将自动保存到同一位置</p>
             
-            <button class="btn btn-primary" onclick="selectFolder()">📂 选择文件夹</button>
+            <div style="border: 2px dashed rgba(0, 212, 255, 0.5); border-radius: 10px; padding: 30px; text-align: center; margin-bottom: 15px; cursor: pointer;" id="dropArea" onclick="selectFolder()">
+                <p style="font-size: 18px; color: #00d4ff;">📂 点击选择文件夹</p>
+                <p style="color: #888; margin-top: 10px;">或拖拽SRT文件到此处</p>
+            </div>
             
             <div id="folderPath" style="display: none;">
                 <strong>已选择:</strong> <span id="folderName"></span>
@@ -405,21 +408,38 @@
                 
                 try {
                     // 读取文件
-                    const file = await f.handle.getFile();
-                    const content = await file.text();
+                    let content;
+                    if (f.handle) {
+                        const file = await f.handle.getFile();
+                        content = await file.text();
+                    } else if (f.file) {
+                        content = await f.file.text();
+                    }
                     
                     // 翻译
                     const result = await translateSRT(content);
                     
-                    // 保存到原位置
-                    const newName = f.name.replace('.srt', '_中文.srt');
-                    const newHandle = await f.dirHandle.getFileHandle(newName, { create: true });
-                    const writable = await newHandle.createWritable();
-                    await writable.write(result);
-                    await writable.close();
-                    
-                    f.status = 'completed';
-                    addLog(`✓ 已保存: ${f.path}${newName}`, 'success');
+                    // 保存到原位置（如果有dirHandle）
+                    if (f.dirHandle) {
+                        const newName = f.name.replace(/\.srt$/i, '_中文.srt');
+                        const newHandle = await f.dirHandle.getFileHandle(newName, { create: true });
+                        const writable = await newHandle.createWritable();
+                        await writable.write(result);
+                        await writable.close();
+                        f.status = 'completed';
+                        addLog(`✓ 已保存: ${f.path}${newName}`, 'success');
+                    } else {
+                        // 没有dirHandle，触发下载
+                        const blob = new Blob([result], { type: 'text/plain;charset=utf-8' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = f.name.replace(/\.srt$/i, '_中文.srt');
+                        a.click();
+                        URL.revokeObjectURL(url);
+                        f.status = 'completed';
+                        addLog(`✓ 已下载: ${f.name.replace(/\.srt$/i, '_中文.srt')}`, 'success');
+                    }
                 } catch (err) {
                     f.status = 'failed';
                     addLog(`✗ 失败: ${f.name} - ${err.message}`, 'error');
@@ -545,7 +565,79 @@ ${texts}`
             document.getElementById('logArea').scrollTop = 99999;
         }
         
-        addLog('工具已就绪，请选择文件夹', 'info');
+        addLog('工具已就绪，请选择文件夹或拖拽SRT文件', 'info');
+        
+        // 拖拽功能
+        const dropArea = document.getElementById('dropArea');
+        
+        dropArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropArea.style.borderColor = '#00ff88';
+            dropArea.style.background = 'rgba(0, 255, 136, 0.1)';
+        });
+        
+        dropArea.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropArea.style.borderColor = 'rgba(0, 212, 255, 0.5)';
+            dropArea.style.background = 'transparent';
+        });
+        
+        dropArea.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            dropArea.style.borderColor = 'rgba(0, 212, 255, 0.5)';
+            dropArea.style.background = 'transparent';
+            
+            files = [];
+            const items = e.dataTransfer.items;
+            
+            addLog(`拖入了 ${items.length} 个项目`, 'info');
+            
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                if (item.kind === 'file') {
+                    // 尝试获取文件系统句柄（用于保存）
+                    if (item.getAsFileSystemHandle) {
+                        const handle = await item.getAsFileSystemHandle();
+                        if (handle.kind === 'directory') {
+                            rootHandle = handle;
+                            document.getElementById('folderName').textContent = handle.name;
+                            document.getElementById('folderPath').style.display = 'block';
+                            addLog(`已选择文件夹: ${handle.name}`, 'success');
+                            await scanDirectory(handle, '');
+                        } else if (handle.kind === 'file' && handle.name.toLowerCase().endsWith('.srt')) {
+                            if (!handle.name.includes('_中文')) {
+                                files.push({
+                                    handle: handle,
+                                    dirHandle: null,
+                                    path: '',
+                                    name: handle.name,
+                                    status: 'pending'
+                                });
+                                addLog(`添加文件: ${handle.name}`, 'success');
+                            }
+                        }
+                    } else {
+                        // 降级：只能读取文件，不能保存到原位置
+                        const file = item.getAsFile();
+                        if (file && file.name.toLowerCase().endsWith('.srt') && !file.name.includes('_中文')) {
+                            files.push({
+                                handle: null,
+                                file: file,
+                                dirHandle: null,
+                                path: '',
+                                name: file.name,
+                                status: 'pending'
+                            });
+                            addLog(`添加文件(只读): ${file.name}`, 'warning');
+                        }
+                    }
+                }
+            }
+            
+            updateFileList();
+            document.getElementById('startBtn').disabled = files.length === 0;
+            addLog(`共找到 ${files.length} 个SRT文件`, 'info');
+        });
     </script>
 </body>
 </html>
