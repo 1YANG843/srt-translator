@@ -266,6 +266,9 @@
             document.querySelector('.notice').style.background = 'rgba(255, 68, 68, 0.2)';
         }
         
+        // 扫描统计
+        let scanStats = { total: 0, chinese: 0, added: 0 };
+        
         // 选择文件夹
         async function selectFolder() {
             try {
@@ -277,28 +280,52 @@
                 
                 // 扫描SRT文件
                 files = [];
-                await scanDirectory(rootHandle, '');
+                scanStats = { total: 0, chinese: 0, added: 0 };
+                const filterChinese = document.getElementById('filterChinese').checked;
+                
+                document.getElementById('statusText').textContent = '正在扫描文件...';
+                await scanDirectory(rootHandle, '', filterChinese);
                 
                 updateFileList();
                 document.getElementById('startBtn').disabled = files.length === 0;
                 
-                addLog(`找到 ${files.length} 个SRT文件`, 'info');
+                if (filterChinese && scanStats.chinese > 0) {
+                    addLog(`扫描完成: 共 ${scanStats.total} 个SRT文件，${scanStats.chinese} 个中文字幕已过滤，${scanStats.added} 个待翻译`, 'info');
+                } else {
+                    addLog(`找到 ${files.length} 个SRT文件`, 'info');
+                }
+                document.getElementById('statusText').textContent = files.length > 0 ? '准备就绪，点击开始翻译' : '未找到需要翻译的文件';
             } catch (err) {
                 if (err.name !== 'AbortError') {
                     addLog(`选择文件夹失败: ${err.message}`, 'error');
                 }
+                document.getElementById('statusText').textContent = '等待选择文件夹...';
             }
         }
         
         // 递归扫描目录
-        async function scanDirectory(dirHandle, path) {
-            addLog(`扫描目录: ${path || '根目录'}`, 'info');
+        async function scanDirectory(dirHandle, path, filterChinese) {
             let count = 0;
             for await (const entry of dirHandle.values()) {
-                addLog(`发现: ${entry.kind} - ${entry.name}`, 'info');
                 if (entry.kind === 'file' && entry.name.toLowerCase().endsWith('.srt')) {
                     // 跳过已翻译的文件
                     if (!entry.name.includes('_中文')) {
+                        scanStats.total++;
+                        document.getElementById('statusText').textContent = `正在扫描... 已检测 ${scanStats.total} 个文件`;
+                        
+                        // 检测是否为中文字幕
+                        if (filterChinese) {
+                            try {
+                                if (await isChinese(entry)) {
+                                    scanStats.chinese++;
+                                    addLog(`过滤中文字幕: ${path}${entry.name}`, 'warning');
+                                    continue; // 跳过中文字幕
+                                }
+                            } catch (e) {
+                                addLog(`检测失败: ${entry.name} - ${e.message}`, 'error');
+                            }
+                        }
+                        
                         files.push({
                             handle: entry,
                             dirHandle: dirHandle,
@@ -306,16 +333,14 @@
                             name: entry.name,
                             status: 'pending'
                         });
+                        scanStats.added++;
                         count++;
-                        addLog(`添加文件: ${entry.name}`, 'success');
-                    } else {
-                        addLog(`跳过已翻译: ${entry.name}`, 'warning');
+                        addLog(`添加文件: ${path}${entry.name}`, 'success');
                     }
                 } else if (entry.kind === 'directory' && entry.name !== '中文字幕') {
-                    await scanDirectory(entry, path + entry.name + '/');
+                    await scanDirectory(entry, path + entry.name + '/', filterChinese);
                 }
             }
-            addLog(`目录 ${path || '根目录'} 扫描完成，找到 ${count} 个SRT文件`, 'info');
         }
         
         // 更新文件列表
@@ -359,10 +384,19 @@
             document.getElementById('progressBar').textContent = pct + '%';
         }
         
-        // 检测中文
-        async function isChinese(handle) {
-            const file = await handle.getFile();
-            const text = await file.text();
+        // 检测中文 - 支持 handle 或 File 对象
+        async function isChinese(handleOrFile) {
+            let text;
+            if (handleOrFile.getFile) {
+                // FileSystemFileHandle
+                const file = await handleOrFile.getFile();
+                text = await file.text();
+            } else if (handleOrFile.text) {
+                // File 对象
+                text = await handleOrFile.text();
+            } else {
+                return false;
+            }
             const cn = (text.match(/[\u4e00-\u9fa5]/g) || []).length;
             const total = text.replace(/[\s\d\n\r:,.\->]/g, '').length;
             return total > 0 && (cn / total) > 0.3;
@@ -588,9 +622,12 @@ ${texts}`
             dropArea.style.background = 'transparent';
             
             files = [];
+            scanStats = { total: 0, chinese: 0, added: 0 };
             const items = e.dataTransfer.items;
+            const filterChinese = document.getElementById('filterChinese').checked;
             
             addLog(`拖入了 ${items.length} 个项目`, 'info');
+            document.getElementById('statusText').textContent = '正在检测文件...';
             
             for (let i = 0; i < items.length; i++) {
                 const item = items[i];
@@ -603,9 +640,25 @@ ${texts}`
                             document.getElementById('folderName').textContent = handle.name;
                             document.getElementById('folderPath').style.display = 'block';
                             addLog(`已选择文件夹: ${handle.name}`, 'success');
-                            await scanDirectory(handle, '');
+                            await scanDirectory(handle, '', filterChinese);
                         } else if (handle.kind === 'file' && handle.name.toLowerCase().endsWith('.srt')) {
                             if (!handle.name.includes('_中文')) {
+                                scanStats.total++;
+                                document.getElementById('statusText').textContent = `正在检测... 已检测 ${scanStats.total} 个文件`;
+                                
+                                // 检测是否为中文字幕
+                                if (filterChinese) {
+                                    try {
+                                        if (await isChinese(handle)) {
+                                            scanStats.chinese++;
+                                            addLog(`过滤中文字幕: ${handle.name}`, 'warning');
+                                            continue;
+                                        }
+                                    } catch (e) {
+                                        addLog(`检测失败: ${handle.name} - ${e.message}`, 'error');
+                                    }
+                                }
+                                
                                 files.push({
                                     handle: handle,
                                     dirHandle: null,
@@ -613,6 +666,7 @@ ${texts}`
                                     name: handle.name,
                                     status: 'pending'
                                 });
+                                scanStats.added++;
                                 addLog(`添加文件: ${handle.name}`, 'success');
                             }
                         }
@@ -620,6 +674,22 @@ ${texts}`
                         // 降级：只能读取文件，不能保存到原位置
                         const file = item.getAsFile();
                         if (file && file.name.toLowerCase().endsWith('.srt') && !file.name.includes('_中文')) {
+                            scanStats.total++;
+                            document.getElementById('statusText').textContent = `正在检测... 已检测 ${scanStats.total} 个文件`;
+                            
+                            // 检测是否为中文字幕
+                            if (filterChinese) {
+                                try {
+                                    if (await isChinese(file)) {
+                                        scanStats.chinese++;
+                                        addLog(`过滤中文字幕: ${file.name}`, 'warning');
+                                        continue;
+                                    }
+                                } catch (e) {
+                                    addLog(`检测失败: ${file.name} - ${e.message}`, 'error');
+                                }
+                            }
+                            
                             files.push({
                                 handle: null,
                                 file: file,
@@ -628,6 +698,7 @@ ${texts}`
                                 name: file.name,
                                 status: 'pending'
                             });
+                            scanStats.added++;
                             addLog(`添加文件(只读): ${file.name}`, 'warning');
                         }
                     }
@@ -636,7 +707,13 @@ ${texts}`
             
             updateFileList();
             document.getElementById('startBtn').disabled = files.length === 0;
-            addLog(`共找到 ${files.length} 个SRT文件`, 'info');
+            
+            if (filterChinese && scanStats.chinese > 0) {
+                addLog(`检测完成: 共 ${scanStats.total} 个SRT文件，${scanStats.chinese} 个中文字幕已过滤，${scanStats.added} 个待翻译`, 'info');
+            } else {
+                addLog(`共找到 ${files.length} 个SRT文件`, 'info');
+            }
+            document.getElementById('statusText').textContent = files.length > 0 ? '准备就绪，点击开始翻译' : '未找到需要翻译的文件';
         });
     </script>
 </body>
