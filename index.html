@@ -171,7 +171,7 @@
             <div class="panel-title">⚙️ API配置</div>
             <div class="config-row">
                 <label>API地址:</label>
-                <input type="text" id="apiUrl" value="http://103.236.78.40:3000/v1/chat/completions">
+                <input type="text" id="apiUrl" value="">
             </div>
             <div class="config-row">
                 <label>API密钥:</label>
@@ -256,6 +256,23 @@
         let rootHandle = null;
         let files = []; // {handle, path, name, status}
         let shouldStop = false;
+        
+        // 自动检测并设置 API 地址
+        // 如果是 HTTPS 网站（如 Vercel），使用代理 API
+        // 如果是本地文件或 HTTP，直接使用原始 API
+        function initApiUrl() {
+            const isHttps = window.location.protocol === 'https:';
+            const isVercel = window.location.hostname.includes('vercel.app');
+            
+            if (isHttps || isVercel) {
+                // 使用代理 API
+                document.getElementById('apiUrl').value = '/api/proxy';
+                addLog('检测到 HTTPS 环境，已自动切换到代理 API', 'info');
+            } else {
+                // 使用原始 API
+                document.getElementById('apiUrl').value = 'http://103.236.78.40:3000/v1/chat/completions';
+            }
+        }
         
         // 检查浏览器支持
         if (!('showDirectoryPicker' in window)) {
@@ -607,6 +624,8 @@ ${texts}`
             document.getElementById('logArea').scrollTop = 99999;
         }
         
+        // 初始化 API 地址
+        initApiUrl();
         addLog('工具已就绪，请选择文件夹或拖拽SRT文件', 'info');
         
         // 拖拽功能
