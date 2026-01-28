@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SRT字幕翻译工具 - 网页版</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Microsoft YaHei', 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #e0e0e0;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #00d4ff;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+        }
+        
+        .main-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        .panel {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+        
+        .panel-title {
+            color: #00d4ff;
+            font-size: 1.3em;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid rgba(0, 212, 255, 0.3);
+        }
+        
+        .config-section {
+            margin-bottom: 20px;
+        }
+        
+        .config-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            gap: 10px;
+        }
+        
+        .config-row label {
+            min-width: 100px;
+            color: #aaa;
+        }
+        
+        .config-row input, .config-row select {
+            flex: 1;
+            padding: 10px 15px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            color: #fff;
+            font-size: 14px;
+        }
+        
+        .config-row input:focus, .config-row select:focus {
+            outline: none;
+            border-color: #00d4ff;
+            box-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
+        }
+        
+        .file-upload {
+            border: 2px dashed rgba(0, 212, 255, 0.5);
+            border-radius: 10px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 15px;
+        }
+        
+        .file-upload:hover {
+            border-color: #00d4ff;
+            background: rgba(0, 212, 255, 0.1);
+        }
+        
+        .file-upload.dragover {
+            border-color: #00ff88;
+            background: rgba(0, 255, 136, 0.1);
+        }
+        
+        .file-upload-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+        
+        textarea {
+            width: 100%;
+            height: 400px;
+            padding: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            color: #e0e0e0;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            resize: vertical;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: #00d4ff;
+        }
+        
+        .btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: bold;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #00d4ff, #0099cc);
+            color: #fff;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0, 212, 255, 0.4);
+        }
+        
+        .btn-primary:disabled {
+            background: #555;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #00ff88, #00cc6a);
+            color: #000;
+        }
+        
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0, 255, 136, 0.4);
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, #ff4444, #cc0000);
+            color: #fff;
+        }
+        
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .progress-section {
+            margin-top: 20px;
+        }
+        
+        .progress-bar-container {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            height: 30px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #00d4ff, #00ff88);
+            width: 0%;
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #000;
+            font-weight: bold;
+        }
+        
+        .status-text {
+            color: #aaa;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        
+        .log-area {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 8px;
+            padding: 15px;
+            height: 150px;
+            overflow-y: auto;
+            font-family: 'Consolas', monospace;
+            font-size: 12px;
+            margin-top: 15px;
+        }
+        
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 3px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        .log-entry.success { color: #00ff88; }
+        .log-entry.error { color: #ff4444; }
+        .log-entry.info { color: #00d4ff; }
+        .log-entry.warning { color: #ffaa00; }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .stat-card {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #00d4ff;
+        }
+        
+        .stat-label {
+            color: #888;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+        
+        .file-info {
+            background: rgba(0, 212, 255, 0.1);
+            border-radius: 8px;
+            padding: 10px 15px;
+            margin-bottom: 15px;
+            display: none;
+        }
+        
+        .file-info.show {
+            display: block;
+        }
+        
+        @media (max-width: 1000px) {
+            .main-layout {
+                grid-template-columns: 1fr;
+            }
+            
+            .stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        /* 滚动条样式 */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 212, 255, 0.5);
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 212, 255, 0.8);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎬 SRT字幕翻译工具</h1>
+        
+        <div class="config-section panel">
+            <div class="panel-title">⚙️ API配置</div>
+            <div class="config-row">
+                <label>API地址:</label>
+                <input type="text" id="apiUrl" value="http://103.236.78.40:3000/v1/chat/completions">
+            </div>
+            <div class="config-row">
+                <label>API密钥:</label>
+                <input type="password" id="apiKey" value="sk-sIWrmpn4cLF7qhRUNEQ833wdbgeezvbc1xG1MrVtvTa1AzXL">
+            </div>
+            <div class="config-row">
+                <label>模型:</label>
+                <input type="text" id="model" value="aws.amazon/claude-opus-4-5:once">
+            </div>
+            <div class="config-row">
+                <label>目标语言:</label>
+                <select id="targetLang">
+                    <option value="简体中文" selected>简体中文</option>
+                    <option value="繁體中文">繁體中文</option>
+                    <option value="English">English</option>
+                    <option value="日本語">日本語</option>
+                    <option value="한국어">한국어</option>
+                </select>
+            </div>
+            <div class="config-row">
+                <label>批量大小:</label>
+                <select id="batchSize">
+                    <option value="10">10条/批</option>
+                    <option value="20">20条/批</option>
+                    <option value="30" selected>30条/批</option>
+                    <option value="50">50条/批</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="main-layout">
+            <div class="panel">
+                <div class="panel-title">📄 原始字幕</div>
+                
+                <div class="file-upload" id="dropZone">
+                    <div class="file-upload-icon">📁</div>
+                    <div>拖拽SRT文件到此处，或点击选择文件</div>
+                    <input type="file" id="fileInput" accept=".srt" style="display: none;">
+                </div>
+                
+                <div class="file-info" id="fileInfo">
+                    <strong>文件:</strong> <span id="fileName"></span> | 
+                    <strong>字幕数:</strong> <span id="subtitleCount">0</span>条
+                </div>
+                
+                <textarea id="sourceText" placeholder="在此粘贴SRT字幕内容，或上传SRT文件...
+
+示例格式:
+1
+00:00:01,000 --> 00:00:04,000
+Hello, welcome to our video.
+
+2
+00:00:04,500 --> 00:00:08,000
+Today we will learn something new."></textarea>
+                
+                <div class="btn-group">
+                    <button class="btn btn-primary" id="translateBtn" onclick="startTranslation()">🚀 开始翻译</button>
+                    <button class="btn btn-danger" id="stopBtn" onclick="stopTranslation()" style="display: none;">⏹ 停止</button>
+                    <button class="btn" style="background: #555; color: #fff;" onclick="clearSource()">🗑 清空</button>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <div class="panel-title">🌏 翻译结果</div>
+                
+                <textarea id="resultText" placeholder="翻译结果将显示在这里..." readonly></textarea>
+                
+                <div class="btn-group">
+                    <button class="btn btn-success" onclick="downloadResult()">💾 下载SRT</button>
+                    <button class="btn btn-primary" onclick="copyResult()">📋 复制结果</button>
+                    <button class="btn" style="background: #555; color: #fff;" onclick="clearResult()">🗑 清空</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="panel" style="margin-top: 20px;">
+            <div class="panel-title">📊 翻译进度</div>
+            
+            <div class="progress-section">
+                <div class="status-text" id="statusText">等待开始翻译...</div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar" id="progressBar">0%</div>
+                </div>
+            </div>
+            
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalCount">0</div>
+                    <div class="stat-label">总字幕数</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="completedCount">0</div>
+                    <div class="stat-label">已完成</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="pendingCount">0</div>
+                    <div class="stat-label">待处理</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="errorCount">0</div>
+                    <div class="stat-label">错误数</div>
+                </div>
+            </div>
+            
+            <div class="log-area" id="logArea">
+                <div class="log-entry info">[系统] SRT字幕翻译工具已就绪</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let subtitles = [];
+        let translatedSubtitles = [];
+        let isTranslating = false;
+        let shouldStop = false;
+        let currentFileName = 'translated';
+        
+        // DOM元素
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const sourceText = document.getElementById('sourceText');
+        const resultText = document.getElementById('resultText');
+        const translateBtn = document.getElementById('translateBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const progressBar = document.getElementById('progressBar');
+        const statusText = document.getElementById('statusText');
+        const logArea = document.getElementById('logArea');
+        const fileInfo = document.getElementById('fileInfo');
+        
+        // 文件拖拽处理
+        dropZone.addEventListener('click', () => fileInput.click());
+        
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+        
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+        
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file && file.name.endsWith('.srt')) {
+                loadFile(file);
+            } else {
+                addLog('请上传.srt格式的字幕文件', 'error');
+            }
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                loadFile(file);
+            }
+        });
+        
+        // 加载文件
+        function loadFile(file) {
+            currentFileName = file.name.replace('.srt', '');
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                sourceText.value = e.target.result;
+                parseSubtitles();
+                document.getElementById('fileName').textContent = file.name;
+                fileInfo.classList.add('show');
+                addLog(`已加载文件: ${file.name}`, 'success');
+            };
+            reader.readAsText(file, 'UTF-8');
+        }
+        
+        // 解析SRT字幕
+        function parseSubtitles() {
+            const content = sourceText.value.trim();
+            if (!content) {
+                subtitles = [];
+                updateStats();
+                return;
+            }
+            
+            subtitles = [];
+            // 按空行分割字幕块
+            const blocks = content.split(/\n\s*\n/);
+            
+            for (const block of blocks) {
+                const lines = block.trim().split('\n');
+                if (lines.length >= 3) {
+                    const index = parseInt(lines[0]);
+                    const timeMatch = lines[1].match(/(\d{2}:\d{2}:\d{2},\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2},\d{3})/);
+                    if (timeMatch && !isNaN(index)) {
+                        const text = lines.slice(2).join('\n');
+                        subtitles.push({
+                            index: index,
+                            startTime: timeMatch[1],
+                            endTime: timeMatch[2],
+                            text: text,
+                            translated: ''
+                        });
+                    }
+                }
+            }
+            
+            document.getElementById('subtitleCount').textContent = subtitles.length;
+            updateStats();
+            addLog(`解析完成，共 ${subtitles.length} 条字幕`, 'info');
+        }
+        
+        // 监听文本框变化
+        sourceText.addEventListener('input', () => {
+            parseSubtitles();
+        });
+        
+        // 更新统计
+        function updateStats() {
+            const completed = translatedSubtitles.length;
+            const total = subtitles.length;
+            const pending = total - completed;
+            
+            document.getElementById('totalCount').textContent = total;
+            document.getElementById('completedCount').textContent = completed;
+            document.getElementById('pendingCount').textContent = pending;
+            
+            const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+            progressBar.style.width = percent + '%';
+            progressBar.textContent = percent + '%';
+        }
+        
+        // 添加日志
+        function addLog(message, type = 'info') {
+            const time = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${time}] ${message}`;
+            logArea.appendChild(entry);
+            logArea.scrollTop = logArea.scrollHeight;
+        }
+        
+        // 开始翻译
+        async function startTranslation() {
+            parseSubtitles();
+            
+            if (subtitles.length === 0) {
+                addLog('请先输入或上传字幕内容', 'error');
+                return;
+            }
+            
+            const apiUrl = document.getElementById('apiUrl').value;
+            const apiKey = document.getElementById('apiKey').value;
+            const model = document.getElementById('model').value;
+            const targetLang = document.getElementById('targetLang').value;
+            const batchSize = parseInt(document.getElementById('batchSize').value);
+            
+            if (!apiKey) {
+                addLog('请输入API密钥', 'error');
+                return;
+            }
+            
+            isTranslating = true;
+            shouldStop = false;
+            translatedSubtitles = [];
+            document.getElementById('errorCount').textContent = '0';
+            
+            translateBtn.style.display = 'none';
+            stopBtn.style.display = 'inline-block';
+            
+            addLog(`开始翻译，目标语言: ${targetLang}，批量大小: ${batchSize}`, 'info');
+            statusText.textContent = '正在翻译...';
+            
+            let errorCount = 0;
+            
+            // 分批翻译
+            for (let i = 0; i < subtitles.length; i += batchSize) {
+                if (shouldStop) {
+                    addLog('翻译已停止', 'warning');
+                    break;
+                }
+                
+                const batch = subtitles.slice(i, Math.min(i + batchSize, subtitles.length));
+                const batchNum = Math.floor(i / batchSize) + 1;
+                const totalBatches = Math.ceil(subtitles.length / batchSize);
+                
+                statusText.textContent = `正在翻译第 ${batchNum}/${totalBatches} 批...`;
+                addLog(`翻译第 ${batchNum}/${totalBatches} 批 (${batch.length}条)`, 'info');
+                
+                try {
+                    const translated = await translateBatch(batch, apiUrl, apiKey, model, targetLang);
+                    
+                    // 合并翻译结果
+                    for (let j = 0; j < batch.length; j++) {
+                        const sub = { ...batch[j] };
+                        sub.translated = translated[j] || batch[j].text;
+                        translatedSubtitles.push(sub);
+                    }
+                    
+                    updateStats();
+                    updateResult();
+                    addLog(`第 ${batchNum} 批翻译完成`, 'success');
+                    
+                } catch (error) {
+                    errorCount++;
+                    document.getElementById('errorCount').textContent = errorCount;
+                    addLog(`第 ${batchNum} 批翻译失败: ${error.message}`, 'error');
+                    
+                    // 保留原文
+                    for (const sub of batch) {
+                        translatedSubtitles.push({ ...sub, translated: sub.text });
+                    }
+                    updateStats();
+                    updateResult();
+                }
+                
+                // 添加延迟避免请求过快
+                if (i + batchSize < subtitles.length && !shouldStop) {
+                    await sleep(1000);
+                }
+            }
+            
+            isTranslating = false;
+            translateBtn.style.display = 'inline-block';
+            stopBtn.style.display = 'none';
+            
+            if (!shouldStop) {
+                statusText.textContent = `翻译完成！共 ${translatedSubtitles.length} 条`;
+                addLog(`翻译全部完成，共 ${translatedSubtitles.length} 条字幕`, 'success');
+            }
+        }
+        
+        // 翻译一批字幕
+        async function translateBatch(batch, apiUrl, apiKey, model, targetLang) {
+            // 构建翻译文本
+            const textsToTranslate = batch.map((sub, idx) => `[${idx + 1}] ${sub.text}`).join('\n');
+            
+            const prompt = `你是一个专业的字幕翻译专家。请将以下字幕翻译成${targetLang}。
+
+要求：
+1. 保持原有的编号格式 [数字]
+2. 只翻译文本内容，不要添加任何解释
+3. 保持翻译简洁自然，适合字幕显示
+4. 每行翻译对应原文的编号
+
+原文：
+${textsToTranslate}
+
+请直接输出翻译结果，格式为：
+[1] 翻译内容
+[2] 翻译内容
+...`;
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({
+                    model: model,
+                    messages: [
+                        {
+                            role: 'user',
+                            content: prompt
+                        }
+                    ],
+                    temperature: 0.3,
+                    max_tokens: 4000
+                })
+            });
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`API错误 ${response.status}: ${errorText}`);
+            }
+            
+            const data = await response.json();
+            const content = data.choices[0].message.content;
+            
+            // 解析翻译结果
+            const translations = [];
+            const lines = content.split('\n');
+            
+            for (const line of lines) {
+                const match = line.match(/\[(\d+)\]\s*(.+)/);
+                if (match) {
+                    const idx = parseInt(match[1]) - 1;
+                    if (idx >= 0 && idx < batch.length) {
+                        translations[idx] = match[2].trim();
+                    }
+                }
+            }
+            
+            // 填充缺失的翻译
+            for (let i = 0; i < batch.length; i++) {
+                if (!translations[i]) {
+                    translations[i] = batch[i].text;
+                }
+            }
+            
+            return translations;
+        }
+        
+        // 更新结果显示
+        function updateResult() {
+            let srtContent = '';
+            for (const sub of translatedSubtitles) {
+                srtContent += `${sub.index}\n`;
+                srtContent += `${sub.startTime} --> ${sub.endTime}\n`;
+                srtContent += `${sub.translated}\n\n`;
+            }
+            resultText.value = srtContent;
+        }
+        
+        // 停止翻译
+        function stopTranslation() {
+            shouldStop = true;
+            addLog('正在停止翻译...', 'warning');
+        }
+        
+        // 下载结果
+        function downloadResult() {
+            const content = resultText.value;
+            if (!content) {
+                addLog('没有可下载的内容', 'error');
+                return;
+            }
+            
+            const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${currentFileName}_中文.srt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            addLog(`已下载: ${currentFileName}_中文.srt`, 'success');
+        }
+        
+        // 复制结果
+        function copyResult() {
+            const content = resultText.value;
+            if (!content) {
+                addLog('没有可复制的内容', 'error');
+                return;
+            }
+            
+            navigator.clipboard.writeText(content).then(() => {
+                addLog('已复制到剪贴板', 'success');
+            }).catch(err => {
+                addLog('复制失败: ' + err.message, 'error');
+            });
+        }
+        
+        // 清空
+        function clearSource() {
+            sourceText.value = '';
+            subtitles = [];
+            fileInfo.classList.remove('show');
+            updateStats();
+        }
+        
+        function clearResult() {
+            resultText.value = '';
+            translatedSubtitles = [];
+            updateStats();
+        }
+        
+        // 辅助函数
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+        
+        // 初始化
+        addLog('工具已就绪，请上传SRT文件或粘贴字幕内容', 'info');
+    </script>
+</body>
+</html>
