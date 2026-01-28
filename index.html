@@ -325,20 +325,13 @@
             let count = 0;
             for await (const entry of dirHandle.values()) {
                 if (entry.kind === 'file' && entry.name.toLowerCase().endsWith('.srt')) {
-                    // 跳过已翻译的文件（检测多种中文标记）
-                    const lowerName = entry.name.toLowerCase();
-                    const isTranslatedFile = entry.name.includes('_中文') ||
-                                            entry.name.includes('中文') ||
-                                            lowerName.includes('zh-cn') ||
-                                            lowerName.includes('zh_cn') ||
-                                            lowerName.includes('chinese') ||
-                                            lowerName.includes('chs') ||
-                                            lowerName.includes('cht');
+                    // 只跳过已翻译的文件（带 _中文 后缀的）
+                    const isTranslatedFile = entry.name.includes('_中文');
                     if (!isTranslatedFile) {
                         scanStats.total++;
                         document.getElementById('statusText').textContent = `正在扫描... 已检测 ${scanStats.total} 个文件`;
                         
-                        // 检测是否为中文字幕
+                        // 检测是否为中文字幕（只检测内容，不检测文件名）
                         if (filterChinese) {
                             try {
                                 if (await isChinese(entry)) {
@@ -362,7 +355,7 @@
                         count++;
                         addLog(`添加文件: ${path}${entry.name}`, 'success');
                     }
-                } else if (entry.kind === 'directory' && entry.name !== '中文字幕') {
+                } else if (entry.kind === 'directory') {
                     await scanDirectory(entry, path + entry.name + '/', filterChinese);
                 }
             }
@@ -411,15 +404,18 @@
         
         // 检测中文 - 支持 handle 或 File 对象
         // 只检测文件内容，不检测文件名
-        // 阈值设为 5%，只有极少量中文的才不过滤
+        // 阈值设为 50%，只有超过一半是中文才过滤
         async function isChinese(handleOrFile) {
             let text;
+            let fileName = '';
             if (handleOrFile.getFile) {
                 // FileSystemFileHandle
+                fileName = handleOrFile.name;
                 const file = await handleOrFile.getFile();
                 text = await file.text();
             } else if (handleOrFile.text) {
                 // File 对象
+                fileName = handleOrFile.name;
                 text = await handleOrFile.text();
             } else {
                 return false;
@@ -427,10 +423,13 @@
             // 只取前 5000 个字符进行检测，提高性能
             const sample = text.substring(0, 5000);
             const cn = (sample.match(/[\u4e00-\u9fa5]/g) || []).length;
-            // 只统计字母字符，排除数字、标点、时间码等
-            const letters = sample.replace(/[\s\d\n\r:,.\->\[\]()（）【】]/g, '').length;
-            // 阈值设为 5%，只有超过5%是中文才认为是中文字幕
-            return letters > 50 && (cn / letters) > 0.05;
+            // 只统计字母字符（包括中文），排除数字、标点、时间码等
+            const letters = sample.replace(/[\s\d\n\r:,.\->\[\]()（）【】'"!?;]/g, '').length;
+            const ratio = letters > 0 ? (cn / letters) : 0;
+            // 调试日志
+            console.log(`[检测] ${fileName}: 中文=${cn}, 字母=${letters}, 比例=${(ratio*100).toFixed(1)}%`);
+            // 阈值设为 50%，只有超过一半是中文才认为是中文字幕
+            return letters > 50 && ratio > 0.5;
         }
         
         // 开始翻译
@@ -680,15 +679,8 @@ ${texts}`
                             addLog(`扫描文件夹: ${handle.name}`, 'success');
                             await scanDirectory(handle, handle.name + '/', filterChinese);
                         } else if (handle.kind === 'file' && handle.name.toLowerCase().endsWith('.srt')) {
-                            // 检测多种中文标记
-                            const lowerName = handle.name.toLowerCase();
-                            const isTranslatedFile = handle.name.includes('_中文') ||
-                                                    handle.name.includes('中文') ||
-                                                    lowerName.includes('zh-cn') ||
-                                                    lowerName.includes('zh_cn') ||
-                                                    lowerName.includes('chinese') ||
-                                                    lowerName.includes('chs') ||
-                                                    lowerName.includes('cht');
+                            // 只跳过已翻译的文件（带 _中文 后缀的）
+                            const isTranslatedFile = handle.name.includes('_中文');
                             if (!isTranslatedFile) {
                                 scanStats.total++;
                                 document.getElementById('statusText').textContent = `正在检测... 已检测 ${scanStats.total} 个文件`;
@@ -720,14 +712,8 @@ ${texts}`
                     } else {
                         // 降级：只能读取文件，不能保存到原位置
                         const file = item.getAsFile();
-                        const lowerFileName = file ? file.name.toLowerCase() : '';
-                        const isTranslatedFile2 = file && (file.name.includes('_中文') ||
-                                                          file.name.includes('中文') ||
-                                                          lowerFileName.includes('zh-cn') ||
-                                                          lowerFileName.includes('zh_cn') ||
-                                                          lowerFileName.includes('chinese') ||
-                                                          lowerFileName.includes('chs') ||
-                                                          lowerFileName.includes('cht'));
+                        // 只跳过已翻译的文件（带 _中文 后缀的）
+                        const isTranslatedFile2 = file && file.name.includes('_中文');
                         if (file && file.name.toLowerCase().endsWith('.srt') && !isTranslatedFile2) {
                             scanStats.total++;
                             document.getElementById('statusText').textContent = `正在检测... 已检测 ${scanStats.total} 个文件`;
