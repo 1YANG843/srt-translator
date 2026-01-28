@@ -440,25 +440,34 @@
                     const result = await translateSRT(content);
                     
                     // 保存到原位置（如果有dirHandle）
+                    const newName = f.name.replace(/\.srt$/i, '_中文.srt');
+                    let saved = false;
+                    
                     if (f.dirHandle) {
-                        const newName = f.name.replace(/\.srt$/i, '_中文.srt');
-                        const newHandle = await f.dirHandle.getFileHandle(newName, { create: true });
-                        const writable = await newHandle.createWritable();
-                        await writable.write(result);
-                        await writable.close();
-                        f.status = 'completed';
-                        addLog(`✓ 已保存: ${f.path}${newName}`, 'success');
-                    } else {
-                        // 没有dirHandle，触发下载
+                        try {
+                            const newHandle = await f.dirHandle.getFileHandle(newName, { create: true });
+                            const writable = await newHandle.createWritable();
+                            await writable.write(result);
+                            await writable.close();
+                            saved = true;
+                            f.status = 'completed';
+                            addLog(`✓ 已保存: ${f.path}${newName}`, 'success');
+                        } catch (saveErr) {
+                            addLog(`保存失败，改为下载: ${saveErr.message}`, 'warning');
+                        }
+                    }
+                    
+                    // 如果保存失败或没有dirHandle，触发下载
+                    if (!saved) {
                         const blob = new Blob([result], { type: 'text/plain;charset=utf-8' });
                         const url = URL.createObjectURL(blob);
                         const a = document.createElement('a');
                         a.href = url;
-                        a.download = f.name.replace(/\.srt$/i, '_中文.srt');
+                        a.download = newName;
                         a.click();
                         URL.revokeObjectURL(url);
                         f.status = 'completed';
-                        addLog(`✓ 已下载: ${f.name.replace(/\.srt$/i, '_中文.srt')}`, 'success');
+                        addLog(`✓ 已下载: ${newName}`, 'success');
                     }
                 } catch (err) {
                     f.status = 'failed';
