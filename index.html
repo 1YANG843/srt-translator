@@ -404,7 +404,7 @@
         
         // 检测中文 - 支持 handle 或 File 对象
         // 只检测文件内容，不检测文件名
-        // 阈值设为 50%，只有超过一半是中文才过滤
+        // 排除日语（包含假名的不算中文）
         async function isChinese(handleOrFile) {
             let text;
             let fileName = '';
@@ -422,12 +422,27 @@
             }
             // 只取前 5000 个字符进行检测，提高性能
             const sample = text.substring(0, 5000);
+            
+            // 检测日语假名（平假名 + 片假名）
+            const hiragana = (sample.match(/[\u3040-\u309f]/g) || []).length;
+            const katakana = (sample.match(/[\u30a0-\u30ff]/g) || []).length;
+            const japaneseKana = hiragana + katakana;
+            
+            // 如果包含假名，说明是日语，不是中文
+            if (japaneseKana > 10) {
+                console.log(`[检测] ${fileName}: 日语假名=${japaneseKana}，判定为日语`);
+                return false;
+            }
+            
+            // 检测中文汉字
             const cn = (sample.match(/[\u4e00-\u9fa5]/g) || []).length;
             // 只统计字母字符（包括中文），排除数字、标点、时间码等
             const letters = sample.replace(/[\s\d\n\r:,.\->\[\]()（）【】'"!?;]/g, '').length;
             const ratio = letters > 0 ? (cn / letters) : 0;
+            
             // 调试日志
             console.log(`[检测] ${fileName}: 中文=${cn}, 字母=${letters}, 比例=${(ratio*100).toFixed(1)}%`);
+            
             // 阈值设为 50%，只有超过一半是中文才认为是中文字幕
             return letters > 50 && ratio > 0.5;
         }
