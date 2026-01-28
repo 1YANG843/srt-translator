@@ -308,8 +308,16 @@
             let count = 0;
             for await (const entry of dirHandle.values()) {
                 if (entry.kind === 'file' && entry.name.toLowerCase().endsWith('.srt')) {
-                    // 跳过已翻译的文件
-                    if (!entry.name.includes('_中文')) {
+                    // 跳过已翻译的文件（检测多种中文标记）
+                    const lowerName = entry.name.toLowerCase();
+                    const isTranslatedFile = entry.name.includes('_中文') ||
+                                            entry.name.includes('中文') ||
+                                            lowerName.includes('zh-cn') ||
+                                            lowerName.includes('zh_cn') ||
+                                            lowerName.includes('chinese') ||
+                                            lowerName.includes('chs') ||
+                                            lowerName.includes('cht');
+                    if (!isTranslatedFile) {
                         scanStats.total++;
                         document.getElementById('statusText').textContent = `正在扫描... 已检测 ${scanStats.total} 个文件`;
                         
@@ -642,7 +650,16 @@ ${texts}`
                             addLog(`已选择文件夹: ${handle.name}`, 'success');
                             await scanDirectory(handle, '', filterChinese);
                         } else if (handle.kind === 'file' && handle.name.toLowerCase().endsWith('.srt')) {
-                            if (!handle.name.includes('_中文')) {
+                            // 检测多种中文标记
+                            const lowerName = handle.name.toLowerCase();
+                            const isTranslatedFile = handle.name.includes('_中文') ||
+                                                    handle.name.includes('中文') ||
+                                                    lowerName.includes('zh-cn') ||
+                                                    lowerName.includes('zh_cn') ||
+                                                    lowerName.includes('chinese') ||
+                                                    lowerName.includes('chs') ||
+                                                    lowerName.includes('cht');
+                            if (!isTranslatedFile) {
                                 scanStats.total++;
                                 document.getElementById('statusText').textContent = `正在检测... 已检测 ${scanStats.total} 个文件`;
                                 
@@ -673,7 +690,15 @@ ${texts}`
                     } else {
                         // 降级：只能读取文件，不能保存到原位置
                         const file = item.getAsFile();
-                        if (file && file.name.toLowerCase().endsWith('.srt') && !file.name.includes('_中文')) {
+                        const lowerFileName = file ? file.name.toLowerCase() : '';
+                        const isTranslatedFile2 = file && (file.name.includes('_中文') ||
+                                                          file.name.includes('中文') ||
+                                                          lowerFileName.includes('zh-cn') ||
+                                                          lowerFileName.includes('zh_cn') ||
+                                                          lowerFileName.includes('chinese') ||
+                                                          lowerFileName.includes('chs') ||
+                                                          lowerFileName.includes('cht'));
+                        if (file && file.name.toLowerCase().endsWith('.srt') && !isTranslatedFile2) {
                             scanStats.total++;
                             document.getElementById('statusText').textContent = `正在检测... 已检测 ${scanStats.total} 个文件`;
                             
