@@ -410,6 +410,8 @@
         }
         
         // 检测中文 - 支持 handle 或 File 对象
+        // 只检测文件内容，不检测文件名
+        // 阈值设为 5%，只有极少量中文的才不过滤
         async function isChinese(handleOrFile) {
             let text;
             if (handleOrFile.getFile) {
@@ -422,9 +424,13 @@
             } else {
                 return false;
             }
-            const cn = (text.match(/[\u4e00-\u9fa5]/g) || []).length;
-            const total = text.replace(/[\s\d\n\r:,.\->]/g, '').length;
-            return total > 0 && (cn / total) > 0.3;
+            // 只取前 5000 个字符进行检测，提高性能
+            const sample = text.substring(0, 5000);
+            const cn = (sample.match(/[\u4e00-\u9fa5]/g) || []).length;
+            // 只统计字母字符，排除数字、标点、时间码等
+            const letters = sample.replace(/[\s\d\n\r:,.\->\[\]()（）【】]/g, '').length;
+            // 阈值设为 5%，只有超过5%是中文才认为是中文字幕
+            return letters > 50 && (cn / letters) > 0.05;
         }
         
         // 开始翻译
