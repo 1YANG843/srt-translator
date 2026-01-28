@@ -289,7 +289,10 @@
         
         // 递归扫描目录
         async function scanDirectory(dirHandle, path) {
+            addLog(`扫描目录: ${path || '根目录'}`, 'info');
+            let count = 0;
             for await (const entry of dirHandle.values()) {
+                addLog(`发现: ${entry.kind} - ${entry.name}`, 'info');
                 if (entry.kind === 'file' && entry.name.toLowerCase().endsWith('.srt')) {
                     // 跳过已翻译的文件
                     if (!entry.name.includes('_中文')) {
@@ -300,11 +303,16 @@
                             name: entry.name,
                             status: 'pending'
                         });
+                        count++;
+                        addLog(`添加文件: ${entry.name}`, 'success');
+                    } else {
+                        addLog(`跳过已翻译: ${entry.name}`, 'warning');
                     }
                 } else if (entry.kind === 'directory' && entry.name !== '中文字幕') {
                     await scanDirectory(entry, path + entry.name + '/');
                 }
             }
+            addLog(`目录 ${path || '根目录'} 扫描完成，找到 ${count} 个SRT文件`, 'info');
         }
         
         // 更新文件列表
