@@ -175,11 +175,11 @@
             </div>
             <div class="config-row">
                 <label>API密钥:</label>
-                <input type="password" id="apiKey" value="sk-sIWrmpn4cLF7qhRUNEQ833wdbgeezvbc1xG1MrVtvTa1AzXL">
+                <input type="password" id="apiKey" value="sk-svbzdauociqyfapawnuarwmuetllcbbkqtpbvefuqpjcinbo">
             </div>
             <div class="config-row">
                 <label>模型:</label>
-                <input type="text" id="model" value="aws.amazon/claude-opus-4-5:once">
+                <input type="text" id="model" value="deepseek-ai/DeepSeek-V3">
                 <label>批量:</label>
                 <select id="batchSize">
                     <option value="10">10条</option>
@@ -258,20 +258,10 @@
         let shouldStop = false;
         
         // 自动检测并设置 API 地址
-        // 如果是 HTTPS 网站（如 Vercel），使用代理 API
-        // 如果是本地文件或 HTTP，直接使用原始 API
+        // 使用 SiliconFlow（硅基流动）的 HTTPS API，国内可直接访问
         function initApiUrl() {
-            const isHttps = window.location.protocol === 'https:';
-            const isVercel = window.location.hostname.includes('vercel.app');
-            
-            if (isHttps || isVercel) {
-                // 使用代理 API
-                document.getElementById('apiUrl').value = '/api/proxy';
-                addLog('检测到 HTTPS 环境，已自动切换到代理 API', 'info');
-            } else {
-                // 使用原始 API
-                document.getElementById('apiUrl').value = 'http://103.236.78.40:3000/v1/chat/completions';
-            }
+            // 默认使用 SiliconFlow HTTPS API（国内可用）
+            document.getElementById('apiUrl').value = 'https://api.siliconflow.cn/v1/chat/completions';
         }
         
         // 检查浏览器支持
