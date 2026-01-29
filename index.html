@@ -161,10 +161,10 @@
         <h1>🎬 SRT字幕批量翻译工具</h1>
         
         <div class="notice">
-            ⚠️ <strong>重要提示</strong>：此工具使用File System Access API，可以直接保存文件到原始位置。
-            <br>• 需要使用 <strong>Chrome 86+</strong> 或 <strong>Edge 86+</strong> 浏览器
-            <br>• 首次使用需要授权文件夹访问权限
-            <br>• 夸克浏览器可能不支持此功能
+            ⚠️ <strong>重要提示</strong>：
+            <br>• <strong>点击选择文件夹</strong>：需要 Chrome/Edge 86+，可自动保存到原位置（仅 HTTPS 或本机可用）
+            <br>• <strong>拖拽文件夹</strong>：所有浏览器都支持，翻译后自动下载（适合局域网访问）
+            <br>• 只翻译文件名含"日语"或"韩语"的 SRT 文件
         </div>
         
         <div class="panel">
@@ -391,6 +391,79 @@
             document.getElementById('progressBar').textContent = pct + '%';
         }
         
+        // 检测文本编码并解码
+        async function readFileWithEncoding(file) {
+            const buffer = await file.arrayBuffer();
+            const bytes = new Uint8Array(buffer);
+            
+            // 检测BOM标记
+            if (bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF) {
+                return new TextDecoder('utf-8').decode(buffer);
+            }
+            if (bytes[0] === 0xFF && bytes[1] === 0xFE) {
+                return new TextDecoder('utf-16le').decode(buffer);
+            }
+            if (bytes[0] === 0xFE && bytes[1] === 0xFF) {
+                return new TextDecoder('utf-16be').decode(buffer);
+            }
+            
+            // 尝试检测是否为有效的UTF-8
+            if (isValidUTF8(bytes)) {
+                const text = new TextDecoder('utf-8').decode(buffer);
+                if (!text.includes('\uFFFD\uFFFD')) {
+                    return text;
+                }
+            }
+            
+            // 尝试GBK编码
+            try {
+                const gbkText = new TextDecoder('gbk').decode(buffer);
+                if (/[\u4e00-\u9fff]/.test(gbkText) && !gbkText.includes('\uFFFD')) {
+                    return gbkText;
+                }
+            } catch (e) {}
+            
+            // 尝试Shift_JIS编码（日语）
+            try {
+                const sjisText = new TextDecoder('shift_jis').decode(buffer);
+                if (/[\u3040-\u309f\u30a0-\u30ff]/.test(sjisText) && !sjisText.includes('\uFFFD')) {
+                    return sjisText;
+                }
+            } catch (e) {}
+            
+            // 尝试EUC-KR编码（韩语）
+            try {
+                const euckrText = new TextDecoder('euc-kr').decode(buffer);
+                if (/[\uac00-\ud7af]/.test(euckrText) && !euckrText.includes('\uFFFD')) {
+                    return euckrText;
+                }
+            } catch (e) {}
+            
+            return new TextDecoder('utf-8').decode(buffer);
+        }
+        
+        // 检查是否为有效的UTF-8编码
+        function isValidUTF8(bytes) {
+            let i = 0;
+            while (i < bytes.length) {
+                if (bytes[i] < 0x80) {
+                    i++;
+                } else if ((bytes[i] & 0xE0) === 0xC0) {
+                    if (i + 1 >= bytes.length || (bytes[i + 1] & 0xC0) !== 0x80) return false;
+                    i += 2;
+                } else if ((bytes[i] & 0xF0) === 0xE0) {
+                    if (i + 2 >= bytes.length || (bytes[i + 1] & 0xC0) !== 0x80 || (bytes[i + 2] & 0xC0) !== 0x80) return false;
+                    i += 3;
+                } else if ((bytes[i] & 0xF8) === 0xF0) {
+                    if (i + 3 >= bytes.length || (bytes[i + 1] & 0xC0) !== 0x80 || (bytes[i + 2] & 0xC0) !== 0x80 || (bytes[i + 3] & 0xC0) !== 0x80) return false;
+                    i += 4;
+                } else {
+                    return false;
+                }
+            }
+            return true;
+        }
+        
         // 开始翻译
         async function startTranslation() {
             if (files.length === 0) return;
@@ -437,13 +510,13 @@
                 addLog(`翻译: ${f.name}`, 'info');
                 
                 try {
-                    // 读取文件
+                    // 读取文件（自动检测编码）
                     let content;
                     if (f.handle) {
                         const file = await f.handle.getFile();
-                        content = await file.text();
+                        content = await readFileWithEncoding(file);
                     } else if (f.file) {
-                        content = await f.file.text();
+                        content = await readFileWithEncoding(f.file);
                     }
                     
                     // 翻译
@@ -632,7 +705,7 @@ ${texts}`
             addLog('检测到拖拽事件...', 'info');
             
             files = [];
-            rootHandle = null; // 重置 rootHandle
+            rootHandle = null;
             scanStats = { total: 0, skipped: 0, added: 0 };
             const items = e.dataTransfer.items;
             const filterByName = document.getElementById('filterByName').checked;
@@ -640,7 +713,7 @@ ${texts}`
             addLog(`拖入了 ${items.length} 个项目`, 'info');
             document.getElementById('statusText').textContent = '正在检测文件...';
             
-            // 关键修复：先同步收集所有 handles（因为 DataTransferItemList 在异步后会失效）
+            // 先同步收集所有 handles（因为 DataTransferItemList 在异步后会失效）
             const handlePromises = [];
             const fallbackFiles = [];
             
@@ -662,16 +735,6 @@ ${texts}`
             const handles = await Promise.all(handlePromises);
             addLog(`获取到 ${handles.length} 个文件系统句柄`, 'info');
             
-            // 调试：显示每个 handle 的信息
-            for (let i = 0; i < handles.length; i++) {
-                const h = handles[i];
-                if (h) {
-                    addLog(`句柄 ${i+1}: ${h.kind} - ${h.name}`, 'info');
-                } else {
-                    addLog(`句柄 ${i+1}: null`, 'warning');
-                }
-            }
-            
             // 收集所有文件夹名称
             let folderNames = [];
             
@@ -684,7 +747,7 @@ ${texts}`
                     folderNames.push(handle.name);
                     addLog(`扫描文件夹: ${handle.name}`, 'success');
                     await scanDirectory(handle, handle.name + '/', filterByName);
-                } else if (handle.kind === 'file' && handle.name.toLowerCase().endsWith('.srt')) {
+                } else if (handle && handle.kind === 'file' && handle.name.toLowerCase().endsWith('.srt')) {
                     const isTranslatedFile = handle.name.includes('_中文');
                     if (!isTranslatedFile) {
                         scanStats.total++;
