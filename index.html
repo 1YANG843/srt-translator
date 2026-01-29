@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SRT字幕批量翻译工具 - 自动保存版</title>
+    <title>SRT字幕批量翻译 - 20窗口并行版</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -11,102 +11,250 @@
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
             min-height: 100vh;
             color: #e0e0e0;
-            padding: 20px;
+            padding: 15px;
         }
-        .container { max-width: 1200px; margin: 0 auto; }
-        h1 {
+        .container { max-width: 1900px; margin: 0 auto; }
+        
+        /* 标题区域 */
+        header {
             text-align: center;
-            color: #00d4ff;
-            margin-bottom: 20px;
-            font-size: 2em;
+            padding: 15px 0;
+            border-bottom: 2px solid #00d4ff;
+            margin-bottom: 15px;
         }
-        .notice {
-            background: rgba(255, 170, 0, 0.2);
-            border: 1px solid #ffaa00;
+        h1 { font-size: 1.6em; color: #00d4ff; }
+        .version-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #00d4ff, #0099cc);
+            color: white;
+            padding: 3px 12px;
+            border-radius: 12px;
+            font-size: 0.6em;
+            margin-left: 10px;
+        }
+        .subtitle { color: #888; font-size: 0.85em; margin-top: 5px; }
+        
+        /* 全局配置区域 */
+        .global-config {
+            background: rgba(0, 0, 0, 0.3);
             border-radius: 10px;
             padding: 15px;
-            margin-bottom: 20px;
-            color: #ffaa00;
-        }
-        .panel {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 15px;
-            padding: 20px;
-            margin-bottom: 20px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        .panel-title {
-            color: #00d4ff;
-            font-size: 1.2em;
             margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid rgba(0, 212, 255, 0.3);
+            border: 1px solid rgba(0, 212, 255, 0.3);
         }
+        .config-title { color: #00d4ff; font-size: 1em; margin-bottom: 10px; }
         .config-row {
             display: flex;
-            align-items: center;
-            margin-bottom: 10px;
-            gap: 10px;
+            gap: 15px;
             flex-wrap: wrap;
+            align-items: center;
         }
-        .config-row label { min-width: 80px; color: #aaa; }
-        .config-row input, .config-row select {
-            flex: 1;
-            min-width: 150px;
-            padding: 8px 12px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
+        .config-item { flex: 1; min-width: 180px; }
+        .config-item label { display: block; color: #888; margin-bottom: 4px; font-size: 0.8em; }
+        .config-item input, .config-item select {
+            width: 100%;
+            padding: 8px 10px;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(0, 212, 255, 0.3);
             border-radius: 6px;
-            background: rgba(0, 0, 0, 0.3);
-            color: #fff;
+            color: #e0e0e0;
+            font-size: 13px;
         }
-        .btn {
-            padding: 12px 25px;
-            border: none;
-            border-radius: 8px;
-            font-size: 15px;
+        .config-item input:focus, .config-item select:focus {
+            outline: none;
+            border-color: #00d4ff;
+        }
+        
+        /* 文件拖放区域 */
+        .drop-zone {
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px dashed rgba(0, 212, 255, 0.5);
+            border-radius: 10px;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 15px;
             cursor: pointer;
             transition: all 0.3s;
-            font-weight: bold;
         }
-        .btn-primary { background: linear-gradient(135deg, #00d4ff, #0099cc); color: #fff; }
-        .btn-success { background: linear-gradient(135deg, #00ff88, #00cc6a); color: #000; }
-        .btn-danger { background: linear-gradient(135deg, #ff4444, #cc0000); color: #fff; }
-        .btn-secondary { background: #555; color: #fff; }
-        .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-        .btn-group { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px; }
-        .file-list {
-            max-height: 350px;
-            overflow-y: auto;
+        .drop-zone:hover, .drop-zone.dragover {
+            border-color: #00ff88;
+            background: rgba(0, 255, 136, 0.1);
+        }
+        .drop-zone-icon { font-size: 2.5em; margin-bottom: 10px; }
+        .drop-zone-text { color: #00d4ff; font-size: 1.1em; }
+        .drop-zone-hint { color: #888; font-size: 0.85em; margin-top: 8px; }
+        
+        /* 队列状态栏 */
+        .status-bar {
             background: rgba(0, 0, 0, 0.3);
             border-radius: 10px;
-            padding: 10px;
-            margin-top: 15px;
+            padding: 12px 15px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            border: 1px solid rgba(0, 212, 255, 0.2);
         }
-        .file-item {
+        .stats-group {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .stat-item {
             display: flex;
             align-items: center;
-            padding: 10px;
-            margin-bottom: 5px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 6px;
-            gap: 10px;
+            gap: 6px;
         }
-        .file-item .name { flex: 1; font-size: 13px; }
-        .file-item .status { min-width: 100px; text-align: right; font-size: 12px; }
-        .file-item.pending .status { color: #aaa; }
-        .file-item.processing .status { color: #00d4ff; }
-        .file-item.completed .status { color: #00ff88; }
-        .file-item.failed .status { color: #ff4444; }
-        .file-item.skipped .status { color: #ffaa00; }
-        .progress-bar-container {
+        .stat-label { color: #888; font-size: 0.85em; }
+        .stat-value { 
+            font-weight: bold; 
+            font-size: 1.1em;
+            min-width: 30px;
+            text-align: center;
+        }
+        .stat-value.pending { color: #ffaa00; }
+        .stat-value.processing { color: #00d4ff; }
+        .stat-value.completed { color: #00ff88; }
+        .stat-value.failed { color: #ff4444; }
+        
+        .btn-group { display: flex; gap: 10px; }
+        button {
+            padding: 10px 20px;
+            font-size: 0.9em;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #00d4ff, #0099cc);
+            color: white;
+        }
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 212, 255, 0.4);
+        }
+        .btn-warning {
+            background: linear-gradient(135deg, #ffaa00, #cc8800);
+            color: white;
+        }
+        .btn-danger {
+            background: linear-gradient(135deg, #ff4444, #cc0000);
+            color: white;
+        }
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #e0e0e0;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+        
+        /* 窗口网格 */
+        .windows-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+        @media (max-width: 1400px) { .windows-grid { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 900px) { .windows-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 600px) { .windows-grid { grid-template-columns: 1fr; } }
+        
+        /* 窗口卡片 */
+        .window-card {
             background: rgba(0, 0, 0, 0.3);
             border-radius: 10px;
-            height: 30px;
-            overflow: hidden;
-            margin: 15px 0;
+            padding: 12px;
+            border: 2px solid rgba(100, 100, 100, 0.3);
+            transition: all 0.3s;
+            min-height: 200px;
+            display: flex;
+            flex-direction: column;
         }
-        .progress-bar {
+        .window-card.idle { border-color: rgba(100, 100, 100, 0.3); }
+        .window-card.processing { 
+            border-color: #00d4ff; 
+            background: rgba(0, 212, 255, 0.1);
+            box-shadow: 0 0 15px rgba(0, 212, 255, 0.2);
+        }
+        .window-card.completed { 
+            border-color: #00ff88; 
+            background: rgba(0, 255, 136, 0.1);
+        }
+        .window-card.error { 
+            border-color: #ff4444; 
+            background: rgba(255, 68, 68, 0.1);
+        }
+        
+        .window-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(0, 212, 255, 0.2);
+        }
+        .window-title {
+            font-weight: bold;
+            color: #00d4ff;
+            font-size: 0.95em;
+        }
+        .window-status {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.75em;
+            padding: 3px 8px;
+            border-radius: 10px;
+            background: rgba(100, 100, 100, 0.5);
+        }
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #666;
+        }
+        .window-card.idle .status-dot { background: #666; }
+        .window-card.processing .status-dot { 
+            background: #00d4ff; 
+            animation: pulse 1.5s infinite;
+        }
+        .window-card.completed .status-dot { background: #00ff88; }
+        .window-card.error .status-dot { background: #ff4444; }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+        
+        .window-file {
+            font-size: 0.85em;
+            color: #aaa;
+            margin-bottom: 8px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .window-file .icon { margin-right: 5px; }
+        
+        .window-progress {
+            margin-bottom: 10px;
+        }
+        .progress-bar-bg {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 6px;
+            height: 20px;
+            overflow: hidden;
+            margin-bottom: 4px;
+        }
+        .progress-bar-fill {
             height: 100%;
             background: linear-gradient(90deg, #00d4ff, #00ff88);
             width: 0%;
@@ -114,331 +262,443 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            color: #000;
+            font-size: 0.75em;
             font-weight: bold;
+            color: #000;
         }
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 10px;
-            margin: 15px 0;
+        .progress-text {
+            font-size: 0.75em;
+            color: #888;
+            text-align: right;
         }
-        .stat-card {
+        
+        .window-preview {
+            flex: 1;
             background: rgba(0, 0, 0, 0.3);
-            border-radius: 8px;
-            padding: 15px;
-            text-align: center;
+            border-radius: 6px;
+            padding: 8px;
+            font-size: 0.8em;
+            overflow: hidden;
         }
-        .stat-value { font-size: 2em; font-weight: bold; color: #00d4ff; }
-        .stat-label { color: #888; font-size: 12px; }
+        .preview-label {
+            color: #666;
+            font-size: 0.85em;
+            margin-bottom: 3px;
+        }
+        .preview-text {
+            color: #aaa;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 6px;
+        }
+        .preview-text.translated { color: #00ff88; }
+        
+        .window-queue {
+            margin-top: 8px;
+            font-size: 0.8em;
+            color: #888;
+            text-align: center;
+            padding: 5px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+        .window-queue .count { color: #ffaa00; font-weight: bold; }
+        
+        /* 日志区域 */
+        .log-panel {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            border: 1px solid rgba(0, 212, 255, 0.2);
+        }
+        .log-title { color: #00d4ff; font-size: 1em; margin-bottom: 10px; }
         .log-area {
             background: rgba(0, 0, 0, 0.4);
-            border-radius: 8px;
-            padding: 12px;
-            height: 150px;
+            border-radius: 6px;
+            padding: 10px;
+            height: 120px;
             overflow-y: auto;
-            font-family: 'Consolas', monospace;
-            font-size: 12px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.8em;
         }
-        .log-entry { margin-bottom: 4px; }
-        .log-entry.success { color: #00ff88; }
-        .log-entry.error { color: #ff4444; }
+        .log-entry { margin-bottom: 4px; line-height: 1.4; }
         .log-entry.info { color: #00d4ff; }
+        .log-entry.success { color: #00ff88; }
         .log-entry.warning { color: #ffaa00; }
-        .checkbox-group { display: flex; align-items: center; gap: 8px; }
-        .checkbox-group input { width: 18px; height: 18px; }
-        #folderPath {
-            background: rgba(0, 212, 255, 0.1);
-            border-radius: 8px;
-            padding: 15px;
-            margin: 15px 0;
-            word-break: break-all;
+        .log-entry.error { color: #ff4444; }
+        
+        /* 加载动画 */
+        .loading-spinner {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s linear infinite;
+            margin-right: 5px;
+            vertical-align: middle;
         }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🎬 SRT字幕批量翻译工具</h1>
+        <!-- 标题区域 -->
+        <header>
+            <h1>🎬 SRT字幕批量翻译 <span class="version-badge">20窗口并行版</span></h1>
+            <p class="subtitle">20个独立翻译窗口 | 批量文件自动分发 | 并行处理提升效率</p>
+        </header>
         
-        <div class="notice">
-            ⚠️ <strong>重要提示</strong>：
-            <br>• <strong>点击选择文件夹</strong>：需要 Chrome/Edge 86+，可自动保存到原位置（仅 HTTPS 或本机可用）
-            <br>• <strong>拖拽文件夹</strong>：所有浏览器都支持，翻译后自动下载（适合局域网访问）
-            <br>• 只翻译文件名含"日语"或"韩语"的 SRT 文件
-        </div>
-        
-        <div class="panel">
-            <div class="panel-title">⚙️ API配置</div>
+        <!-- 全局配置区域 -->
+        <div class="global-config">
+            <div class="config-title">⚙️ 全局配置</div>
             <div class="config-row">
-                <label>API地址:</label>
-                <input type="text" id="apiUrl" value="">
-            </div>
-            <div class="config-row">
-                <label>API密钥:</label>
-                <input type="password" id="apiKey" value="sk-svbzdauociqyfapawnuarwmuetllcbbkqtpbvefuqpjcinbo">
-            </div>
-            <div class="config-row">
-                <label>模型:</label>
-                <input type="text" id="model" value="deepseek-ai/DeepSeek-V3">
-                <label>批量:</label>
-                <select id="batchSize">
-                    <option value="10">10条</option>
-                    <option value="15">15条</option>
-                    <option value="20" selected>20条</option>
-                    <option value="30">30条</option>
-                </select>
-            </div>
-            <div class="config-row">
-                <div class="checkbox-group">
-                    <input type="checkbox" id="filterByName" checked>
-                    <label for="filterByName">只翻译文件名含"日语"或"韩语"的文件</label>
+                <div class="config-item" style="flex: 2;">
+                    <label>API地址</label>
+                    <input type="text" id="apiUrl" value="https://api.siliconflow.cn/v1/chat/completions">
+                </div>
+                <div class="config-item" style="flex: 2;">
+                    <label>API密钥</label>
+                    <input type="password" id="apiKey" value="sk-svbzdauociqyfapawnuarwmuetllcbbkqtpbvefuqpjcinbo">
+                </div>
+                <div class="config-item">
+                    <label>模型</label>
+                    <input type="text" id="model" value="deepseek-ai/DeepSeek-V3">
+                </div>
+                <div class="config-item" style="flex: 0.5;">
+                    <label>批量条数</label>
+                    <select id="batchSize">
+                        <option value="10">10条</option>
+                        <option value="15">15条</option>
+                        <option value="20" selected>20条</option>
+                        <option value="30">30条</option>
+                    </select>
                 </div>
             </div>
         </div>
         
-        <div class="panel" id="dropZone">
-            <div class="panel-title">📁 选择文件夹</div>
-            <p style="color: #aaa; margin-bottom: 15px;">选择包含SRT字幕文件的文件夹，翻译后的文件将自动保存到同一位置</p>
-            
-            <div style="border: 2px dashed rgba(0, 212, 255, 0.5); border-radius: 10px; padding: 30px; text-align: center; margin-bottom: 15px; cursor: pointer;" id="dropArea" onclick="selectFolder()">
-                <p style="font-size: 18px; color: #00d4ff;">📂 点击选择文件夹（推荐，可自动保存）</p>
-                <p style="color: #888; margin-top: 10px;">或拖拽文件夹到此处（翻译后下载）</p>
-            </div>
-            
-            <div id="folderPath" style="display: none;">
-                <strong>已选择:</strong> <span id="folderName"></span>
-            </div>
-            
-            <div class="file-list" id="fileList" style="display: none;"></div>
-            
-            <div class="btn-group">
-                <span style="color: #aaa;" id="fileCount">共 0 个文件</span>
-            </div>
+        <!-- 文件拖放区域 -->
+        <div class="drop-zone" id="dropZone">
+            <div class="drop-zone-icon">📂</div>
+            <div class="drop-zone-text">拖拽SRT文件到此处 或 点击选择文件</div>
+            <div class="drop-zone-hint">支持批量拖入多个文件，自动分配到空闲窗口处理</div>
         </div>
         
-        <div class="panel">
-            <div class="panel-title">📊 翻译进度</div>
-            <div id="statusText" style="color: #aaa;">等待选择文件夹...</div>
-            <div class="progress-bar-container">
-                <div class="progress-bar" id="progressBar">0%</div>
-            </div>
-            <div class="stats">
-                <div class="stat-card">
-                    <div class="stat-value" id="totalCount">0</div>
-                    <div class="stat-label">总文件</div>
+        <!-- 队列状态栏 -->
+        <div class="status-bar">
+            <div class="stats-group">
+                <div class="stat-item">
+                    <span class="stat-label">待处理:</span>
+                    <span class="stat-value pending" id="statPending">0</span>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="completedCount">0</div>
-                    <div class="stat-label">已完成</div>
+                <div class="stat-item">
+                    <span class="stat-label">处理中:</span>
+                    <span class="stat-value processing" id="statProcessing">0</span>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="skippedCount">0</div>
-                    <div class="stat-label">已跳过</div>
+                <div class="stat-item">
+                    <span class="stat-label">已完成:</span>
+                    <span class="stat-value completed" id="statCompleted">0</span>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="errorCount">0</div>
-                    <div class="stat-label">失败</div>
+                <div class="stat-item">
+                    <span class="stat-label">失败:</span>
+                    <span class="stat-value failed" id="statFailed">0</span>
                 </div>
             </div>
             <div class="btn-group">
-                <button class="btn btn-success" id="startBtn" onclick="startTranslation()" disabled>🚀 开始翻译</button>
-                <button class="btn btn-danger" id="stopBtn" onclick="stopTranslation()" style="display:none;">⏹️ 停止</button>
+                <button class="btn-primary" id="btnStart" disabled>🚀 开始翻译</button>
+                <button class="btn-warning" id="btnPause" disabled>⏸️ 暂停</button>
+                <button class="btn-danger" id="btnClear">🗑️ 清空队列</button>
             </div>
         </div>
         
-        <div class="panel">
-            <div class="panel-title">📝 日志</div>
+        <!-- 15个窗口网格 -->
+        <div class="windows-grid" id="windowsGrid">
+            <!-- 窗口将由JavaScript动态生成 -->
+        </div>
+        
+        <!-- 日志区域 -->
+        <div class="log-panel">
+            <div class="log-title">📝 运行日志</div>
             <div class="log-area" id="logArea"></div>
         </div>
     </div>
 
     <script>
-        let rootHandle = null;
-        let files = []; // {handle, path, name, status}
-        let shouldStop = false;
+        // ==================== 第一步：基础框架 ====================
         
-        // 自动检测并设置 API 地址
-        // 使用 SiliconFlow（硅基流动）的 HTTPS API，国内可直接访问
-        function initApiUrl() {
-            // 默认使用 SiliconFlow HTTPS API（国内可用）
-            document.getElementById('apiUrl').value = 'https://api.siliconflow.cn/v1/chat/completions';
-        }
+        // 全局配置
+        const CONFIG = {
+            windowCount: 20,  // 窗口数量
+            apiUrl: '',
+            apiKey: '',
+            model: '',
+            batchSize: 20
+        };
         
-        // 检查浏览器支持
-        if (!('showDirectoryPicker' in window)) {
-            document.querySelector('.notice').innerHTML = 
-                '❌ <strong>您的浏览器不支持File System Access API</strong><br>' +
-                '请使用 Chrome 86+ 或 Edge 86+ 浏览器，或者使用桌面版工具。';
-            document.querySelector('.notice').style.borderColor = '#ff4444';
-            document.querySelector('.notice').style.background = 'rgba(255, 68, 68, 0.2)';
-        }
+        // 窗口状态数组
+        let windows = [];
         
-        // 扫描统计
-        let scanStats = { total: 0, chinese: 0, added: 0 };
+        // 全局统计
+        let stats = {
+            pending: 0,
+            processing: 0,
+            completed: 0,
+            failed: 0
+        };
         
-        // 选择文件夹
-        async function selectFolder() {
-            try {
-                rootHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
-                document.getElementById('folderName').textContent = rootHandle.name;
-                document.getElementById('folderPath').style.display = 'block';
-                
-                addLog(`已选择文件夹: ${rootHandle.name}`, 'success');
-                
-                // 扫描SRT文件
-                files = [];
-                scanStats = { total: 0, skipped: 0, added: 0 };
-                const filterByName = document.getElementById('filterByName').checked;
-                
-                document.getElementById('statusText').textContent = '正在扫描文件...';
-                await scanDirectory(rootHandle, '', filterByName);
-                
-                updateFileList();
-                document.getElementById('startBtn').disabled = files.length === 0;
-                
-                if (filterByName && scanStats.skipped > 0) {
-                    addLog(`扫描完成: 共 ${scanStats.total} 个SRT文件，${scanStats.skipped} 个已跳过（文件名不含日语/韩语），${scanStats.added} 个待翻译`, 'info');
-                } else {
-                    addLog(`找到 ${files.length} 个SRT文件`, 'info');
-                }
-                document.getElementById('statusText').textContent = files.length > 0 ? '准备就绪，点击开始翻译' : '未找到需要翻译的文件';
-            } catch (err) {
-                if (err.name !== 'AbortError') {
-                    addLog(`选择文件夹失败: ${err.message}`, 'error');
-                }
-                document.getElementById('statusText').textContent = '等待选择文件夹...';
+        // 全局控制状态
+        let isRunning = false;
+        let isPaused = false;
+        
+        // 初始化窗口数据结构
+        function initWindows() {
+            windows = [];
+            for (let i = 0; i < CONFIG.windowCount; i++) {
+                windows.push({
+                    id: i,
+                    status: 'idle',      // idle | processing | completed | error
+                    currentFile: null,   // 当前处理的文件对象
+                    queue: [],           // 待处理文件队列
+                    progress: {
+                        current: 0,
+                        total: 0,
+                        percent: 0
+                    },
+                    preview: {
+                        original: '',
+                        translated: ''
+                    },
+                    error: null
+                });
             }
         }
         
-        // 检测文件名是否包含"日语"或"韩语"
-        function shouldTranslate(fileName) {
-            return fileName.includes('日语') || fileName.includes('韩语');
-        }
-        
-        // 递归扫描目录
-        async function scanDirectory(dirHandle, path, filterByName) {
-            let count = 0;
-            for await (const entry of dirHandle.values()) {
-                if (entry.kind === 'file' && entry.name.toLowerCase().endsWith('.srt')) {
-                    // 跳过已翻译的文件（带 _中文 后缀的）
-                    const isTranslatedFile = entry.name.includes('_中文');
-                    if (!isTranslatedFile) {
-                        scanStats.total++;
-                        document.getElementById('statusText').textContent = `正在扫描... 已检测 ${scanStats.total} 个文件`;
-                        
-                        // 只翻译文件名含"日语"或"韩语"的文件
-                        if (filterByName && !shouldTranslate(entry.name)) {
-                            scanStats.skipped++;
-                            addLog(`跳过: ${path}${entry.name}（文件名不含日语/韩语）`, 'warning');
-                            continue;
-                        }
-                        
-                        files.push({
-                            handle: entry,
-                            dirHandle: dirHandle,
-                            path: path,
-                            name: entry.name,
-                            status: 'pending'
-                        });
-                        scanStats.added++;
-                        count++;
-                        addLog(`添加文件: ${path}${entry.name}`, 'success');
-                    }
-                } else if (entry.kind === 'directory') {
-                    await scanDirectory(entry, path + entry.name + '/', filterByName);
-                }
-            }
-        }
-        
-        // 更新文件列表
-        function updateFileList() {
-            const list = document.getElementById('fileList');
-            if (files.length === 0) {
-                list.style.display = 'none';
-                return;
-            }
+        // 生成窗口卡片HTML
+        function createWindowCard(windowData) {
+            const statusText = {
+                'idle': '空闲',
+                'processing': '处理中',
+                'completed': '已完成',
+                'error': '错误'
+            };
             
-            list.style.display = 'block';
-            list.innerHTML = files.map((f, i) => `
-                <div class="file-item ${f.status}" id="file-${i}">
-                    <span class="name">${f.path}${f.name}</span>
-                    <span class="status">${getStatusText(f.status)}</span>
+            return `
+                <div class="window-card ${windowData.status}" id="window-${windowData.id}">
+                    <div class="window-header">
+                        <span class="window-title">窗口 ${windowData.id + 1}</span>
+                        <span class="window-status">
+                            <span class="status-dot"></span>
+                            <span class="status-text">${statusText[windowData.status]}</span>
+                        </span>
+                    </div>
+                    <div class="window-file">
+                        <span class="icon">📄</span>
+                        <span class="filename">${windowData.currentFile ? windowData.currentFile.name : '等待分配文件...'}</span>
+                    </div>
+                    <div class="window-progress">
+                        <div class="progress-bar-bg">
+                            <div class="progress-bar-fill" style="width: ${windowData.progress.percent}%">
+                                ${windowData.progress.percent > 0 ? windowData.progress.percent + '%' : ''}
+                            </div>
+                        </div>
+                        <div class="progress-text">${windowData.progress.current}/${windowData.progress.total} 条字幕</div>
+                    </div>
+                    <div class="window-preview">
+                        <div class="preview-label">原文:</div>
+                        <div class="preview-text original">${windowData.preview.original || '-'}</div>
+                        <div class="preview-label">译文:</div>
+                        <div class="preview-text translated">${windowData.preview.translated || '-'}</div>
+                    </div>
+                    <div class="window-queue">
+                        队列: <span class="count">${windowData.queue.length}</span> 个文件待处理
+                    </div>
                 </div>
-            `).join('');
+            `;
+        }
+        
+        // 渲染所有窗口
+        function renderWindows() {
+            const grid = document.getElementById('windowsGrid');
+            grid.innerHTML = windows.map(w => createWindowCard(w)).join('');
+        }
+        
+        // 更新单个窗口显示
+        function updateWindowUI(windowId) {
+            const windowData = windows[windowId];
+            const card = document.getElementById(`window-${windowId}`);
+            if (!card) return;
             
-            document.getElementById('fileCount').textContent = `共 ${files.length} 个文件`;
-            updateStats();
+            const statusText = {
+                'idle': '空闲',
+                'processing': '处理中',
+                'completed': '已完成',
+                'error': '错误'
+            };
+            
+            // 更新卡片状态类
+            card.className = `window-card ${windowData.status}`;
+            
+            // 更新状态文本
+            card.querySelector('.status-text').textContent = statusText[windowData.status];
+            
+            // 更新文件名
+            card.querySelector('.filename').textContent = 
+                windowData.currentFile ? windowData.currentFile.name : '等待分配文件...';
+            
+            // 更新进度条
+            const progressFill = card.querySelector('.progress-bar-fill');
+            progressFill.style.width = windowData.progress.percent + '%';
+            progressFill.textContent = windowData.progress.percent > 0 ? windowData.progress.percent + '%' : '';
+            
+            // 更新进度文本
+            card.querySelector('.progress-text').textContent = 
+                `${windowData.progress.current}/${windowData.progress.total} 条字幕`;
+            
+            // 更新预览
+            card.querySelector('.preview-text.original').textContent = windowData.preview.original || '-';
+            card.querySelector('.preview-text.translated').textContent = windowData.preview.translated || '-';
+            
+            // 更新队列数量
+            card.querySelector('.window-queue .count').textContent = windowData.queue.length;
         }
         
-        function getStatusText(s) {
-            return { pending: '待处理', processing: '翻译中...', completed: '✓ 已保存', failed: '✗ 失败', skipped: '⊘ 跳过' }[s] || s;
-        }
-        
+        // 更新全局统计显示
         function updateStats() {
-            const total = files.length;
-            const completed = files.filter(f => f.status === 'completed').length;
-            const skipped = files.filter(f => f.status === 'skipped').length;
-            const failed = files.filter(f => f.status === 'failed').length;
+            document.getElementById('statPending').textContent = stats.pending;
+            document.getElementById('statProcessing').textContent = stats.processing;
+            document.getElementById('statCompleted').textContent = stats.completed;
+            document.getElementById('statFailed').textContent = stats.failed;
             
-            document.getElementById('totalCount').textContent = total;
-            document.getElementById('completedCount').textContent = completed;
-            document.getElementById('skippedCount').textContent = skipped;
-            document.getElementById('errorCount').textContent = failed;
-            
-            const done = completed + skipped + failed;
-            const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-            document.getElementById('progressBar').style.width = pct + '%';
-            document.getElementById('progressBar').textContent = pct + '%';
+            // 更新按钮状态
+            const hasFiles = stats.pending > 0 || stats.processing > 0;
+            document.getElementById('btnStart').disabled = !hasFiles || isRunning;
+            document.getElementById('btnPause').disabled = !isRunning;
         }
+        
+        // 添加日志
+        function addLog(message, type = 'info') {
+            const logArea = document.getElementById('logArea');
+            const time = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${time}] ${message}`;
+            logArea.appendChild(entry);
+            logArea.scrollTop = logArea.scrollHeight;
+        }
+        
+        // 读取配置
+        function readConfig() {
+            CONFIG.apiUrl = document.getElementById('apiUrl').value.trim();
+            CONFIG.apiKey = document.getElementById('apiKey').value.trim();
+            CONFIG.model = document.getElementById('model').value.trim();
+            CONFIG.batchSize = parseInt(document.getElementById('batchSize').value);
+        }
+        
+        // 初始化事件监听
+        function initEventListeners() {
+            // 开始按钮
+            document.getElementById('btnStart').addEventListener('click', startTranslation);
+            
+            // 暂停按钮
+            document.getElementById('btnPause').addEventListener('click', togglePause);
+            
+            // 清空按钮
+            document.getElementById('btnClear').addEventListener('click', clearAllQueues);
+            
+            // 拖放区域点击
+            document.getElementById('dropZone').addEventListener('click', selectFiles);
+        }
+        
+        // ==================== 第三步：翻译处理功能 ====================
         
         // 检测文本编码并解码
         async function readFileWithEncoding(file) {
+            // 首先尝试读取原始字节
             const buffer = await file.arrayBuffer();
             const bytes = new Uint8Array(buffer);
             
             // 检测BOM标记
             if (bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF) {
+                // UTF-8 with BOM
                 return new TextDecoder('utf-8').decode(buffer);
             }
             if (bytes[0] === 0xFF && bytes[1] === 0xFE) {
+                // UTF-16 LE
                 return new TextDecoder('utf-16le').decode(buffer);
             }
             if (bytes[0] === 0xFE && bytes[1] === 0xFF) {
+                // UTF-16 BE
                 return new TextDecoder('utf-16be').decode(buffer);
             }
             
             // 尝试检测是否为有效的UTF-8
             if (isValidUTF8(bytes)) {
                 const text = new TextDecoder('utf-8').decode(buffer);
+                // 检查是否有乱码特征（连续的替换字符）
                 if (!text.includes('\uFFFD\uFFFD')) {
                     return text;
                 }
             }
             
-            // 尝试GBK编码
+            // 尝试GBK编码（中文Windows常用）
             try {
-                const gbkText = new TextDecoder('gbk').decode(buffer);
-                if (/[\u4e00-\u9fff]/.test(gbkText) && !gbkText.includes('\uFFFD')) {
+                const gbkDecoder = new TextDecoder('gbk');
+                const gbkText = gbkDecoder.decode(buffer);
+                // 检查解码结果是否包含有效中文字符
+                if (containsChinese(gbkText) && !gbkText.includes('\uFFFD')) {
                     return gbkText;
                 }
-            } catch (e) {}
+            } catch (e) {
+                // GBK解码器不可用
+            }
+            
+            // 尝试GB2312编码
+            try {
+                const gb2312Decoder = new TextDecoder('gb2312');
+                const gb2312Text = gb2312Decoder.decode(buffer);
+                if (containsChinese(gb2312Text) && !gb2312Text.includes('\uFFFD')) {
+                    return gb2312Text;
+                }
+            } catch (e) {
+                // GB2312解码器不可用
+            }
+            
+            // 尝试Big5编码（繁体中文）
+            try {
+                const big5Decoder = new TextDecoder('big5');
+                const big5Text = big5Decoder.decode(buffer);
+                if (containsChinese(big5Text) && !big5Text.includes('\uFFFD')) {
+                    return big5Text;
+                }
+            } catch (e) {
+                // Big5解码器不可用
+            }
             
             // 尝试Shift_JIS编码（日语）
             try {
-                const sjisText = new TextDecoder('shift_jis').decode(buffer);
-                if (/[\u3040-\u309f\u30a0-\u30ff]/.test(sjisText) && !sjisText.includes('\uFFFD')) {
+                const sjisDecoder = new TextDecoder('shift_jis');
+                const sjisText = sjisDecoder.decode(buffer);
+                if (containsJapanese(sjisText) && !sjisText.includes('\uFFFD')) {
                     return sjisText;
                 }
-            } catch (e) {}
+            } catch (e) {
+                // Shift_JIS解码器不可用
+            }
             
             // 尝试EUC-KR编码（韩语）
             try {
-                const euckrText = new TextDecoder('euc-kr').decode(buffer);
-                if (/[\uac00-\ud7af]/.test(euckrText) && !euckrText.includes('\uFFFD')) {
+                const euckrDecoder = new TextDecoder('euc-kr');
+                const euckrText = euckrDecoder.decode(buffer);
+                if (containsKorean(euckrText) && !euckrText.includes('\uFFFD')) {
                     return euckrText;
                 }
-            } catch (e) {}
+            } catch (e) {
+                // EUC-KR解码器不可用
+            }
             
+            // 默认使用UTF-8
             return new TextDecoder('utf-8').decode(buffer);
         }
         
@@ -464,149 +724,68 @@
             return true;
         }
         
-        // 开始翻译
-        async function startTranslation() {
-            if (files.length === 0) return;
-            
-            shouldStop = false;
-            document.getElementById('startBtn').style.display = 'none';
-            document.getElementById('stopBtn').style.display = 'inline-block';
-            
-            // 收集所有需要权限的文件夹，一次性请求
-            const dirHandles = new Set();
-            for (const f of files) {
-                if (f.dirHandle) {
-                    dirHandles.add(f.dirHandle);
-                }
-            }
-            
-            // 一次性请求所有文件夹的写入权限
-            if (dirHandles.size > 0) {
-                addLog(`请求 ${dirHandles.size} 个文件夹的写入权限...`, 'info');
-                for (const dirHandle of dirHandles) {
-                    try {
-                        await dirHandle.requestPermission({ mode: 'readwrite' });
-                    } catch (e) {
-                        addLog(`权限请求失败: ${dirHandle.name}`, 'warning');
-                    }
-                }
-            }
-            
-            addLog('开始批量翻译...', 'info');
-            
-            for (let i = 0; i < files.length; i++) {
-                if (shouldStop) {
-                    addLog('翻译已停止', 'warning');
-                    break;
-                }
-                
-                const f = files[i];
-                if (f.status !== 'pending') continue;
-                
-                document.getElementById('statusText').textContent = `处理 ${i+1}/${files.length}: ${f.name}`;
-                
-                f.status = 'processing';
-                updateFileItem(i);
-                addLog(`翻译: ${f.name}`, 'info');
-                
-                try {
-                    // 读取文件（自动检测编码）
-                    let content;
-                    if (f.handle) {
-                        const file = await f.handle.getFile();
-                        content = await readFileWithEncoding(file);
-                    } else if (f.file) {
-                        content = await readFileWithEncoding(f.file);
-                    }
-                    
-                    // 翻译
-                    const result = await translateSRT(content);
-                    
-                    // 保存到原位置（如果有dirHandle）
-                    const newName = f.name.replace(/\.srt$/i, '_中文.srt');
-                    let saved = false;
-                    
-                    if (f.dirHandle) {
-                        try {
-                            const newHandle = await f.dirHandle.getFileHandle(newName, { create: true });
-                            const writable = await newHandle.createWritable();
-                            await writable.write(result);
-                            await writable.close();
-                            saved = true;
-                            f.status = 'completed';
-                            addLog(`✓ 已保存: ${f.path}${newName}`, 'success');
-                        } catch (saveErr) {
-                            addLog(`保存失败: ${saveErr.message}`, 'warning');
-                        }
-                    }
-                    
-                    // 如果保存失败或没有dirHandle，触发下载
-                    if (!saved) {
-                        const blob = new Blob([result], { type: 'text/plain;charset=utf-8' });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = newName;
-                        a.click();
-                        URL.revokeObjectURL(url);
-                        f.status = 'completed';
-                        addLog(`✓ 已下载: ${newName}`, 'success');
-                    }
-                } catch (err) {
-                    f.status = 'failed';
-                    addLog(`✗ 失败: ${f.name} - ${err.message}`, 'error');
-                }
-                
-                updateFileItem(i);
-                
-                if (i < files.length - 1 && !shouldStop) {
-                    await new Promise(r => setTimeout(r, 500));
-                }
-            }
-            
-            document.getElementById('startBtn').style.display = 'inline-block';
-            document.getElementById('stopBtn').style.display = 'none';
-            
-            const done = files.filter(f => f.status === 'completed').length;
-            document.getElementById('statusText').textContent = `完成！成功翻译 ${done} 个文件`;
-            addLog(`批量翻译完成，成功: ${done}`, 'success');
+        // 检查是否包含中文字符
+        function containsChinese(text) {
+            return /[\u4e00-\u9fff]/.test(text);
         }
         
-        function updateFileItem(i) {
-            const el = document.getElementById(`file-${i}`);
-            if (el) {
-                el.className = `file-item ${files[i].status}`;
-                el.querySelector('.status').textContent = getStatusText(files[i].status);
-            }
-            updateStats();
+        // 检查是否包含日语字符（平假名、片假名）
+        function containsJapanese(text) {
+            return /[\u3040-\u309f\u30a0-\u30ff]/.test(text);
         }
         
-        // 翻译SRT
-        async function translateSRT(content) {
-            const subs = parseSRT(content);
-            if (subs.length === 0) throw new Error('无法解析');
-            
-            const apiUrl = document.getElementById('apiUrl').value;
-            const apiKey = document.getElementById('apiKey').value;
-            const model = document.getElementById('model').value;
-            const batchSize = parseInt(document.getElementById('batchSize').value);
-            
+        // 检查是否包含韩语字符
+        function containsKorean(text) {
+            return /[\uac00-\ud7af\u1100-\u11ff]/.test(text);
+        }
+        
+        // 解析SRT文件内容
+        function parseSRT(content) {
             const result = [];
+            const blocks = content.trim().split(/\n\s*\n/);
             
-            for (let i = 0; i < subs.length; i += batchSize) {
-                if (shouldStop) throw new Error('已停止');
-                
-                const batch = subs.slice(i, i + batchSize);
-                const texts = batch.map((s, j) => `[${j+1}] ${s.text}`).join('\n');
-                
-                const resp = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-                    body: JSON.stringify({
-                        model,
-                        messages: [{ 
-                            role: 'user', 
-                            content: `你是专业字幕翻译员。将以下字幕翻译成简体中文。
+            for (const block of blocks) {
+                const lines = block.trim().split('\n');
+                if (lines.length >= 3) {
+                    const index = parseInt(lines[0]);
+                    const timeMatch = lines[1].match(/(\d{2}:\d{2}:\d{2},\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2},\d{3})/);
+                    if (timeMatch && !isNaN(index)) {
+                        result.push({
+                            index: index,
+                            start: timeMatch[1],
+                            end: timeMatch[2],
+                            text: lines.slice(2).join('\n')
+                        });
+                    }
+                }
+            }
+            return result;
+        }
+        
+        // 生成SRT格式输出
+        function generateSRT(subtitles) {
+            return subtitles.map(s => 
+                `${s.index}\n${s.start} --> ${s.end}\n${s.text}`
+            ).join('\n\n');
+        }
+        
+        // 调用翻译API
+        async function translateBatch(texts, windowId) {
+            readConfig();
+            
+            const numberedTexts = texts.map((t, i) => `[${i + 1}] ${t}`).join('\n');
+            
+            const response = await fetch(CONFIG.apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${CONFIG.apiKey}`
+                },
+                body: JSON.stringify({
+                    model: CONFIG.model,
+                    messages: [{
+                        role: 'user',
+                        content: `你是专业字幕翻译员。将以下字幕翻译成简体中文。
 
 规则：
 1. 保持[数字]格式不变
@@ -614,207 +793,452 @@
 3. 只输出翻译结果，不要解释
 
 原文：
-${texts}` 
-                        }],
-                        temperature: 0.3,
-                        max_tokens: 4000
-                    })
+${numberedTexts}`
+                    }],
+                    temperature: 0.3,
+                    max_tokens: 4000
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`API错误 ${response.status}`);
+            }
+            
+            const data = await response.json();
+            const content = data.choices[0].message.content;
+            
+            // 解析翻译结果
+            const translations = [];
+            const lines = content.split('\n');
+            
+            for (const line of lines) {
+                const match = line.match(/\[(\d+)\]\s*(.+)/);
+                if (match) {
+                    const idx = parseInt(match[1]) - 1;
+                    if (idx >= 0 && idx < texts.length) {
+                        translations[idx] = match[2].trim();
+                    }
+                }
+            }
+            
+            // 填充未翻译的条目
+            for (let i = 0; i < texts.length; i++) {
+                if (!translations[i]) {
+                    translations[i] = texts[i];  // 保留原文
+                }
+            }
+            
+            return translations;
+        }
+        
+        // 处理单个窗口的翻译任务
+        async function processWindow(windowId) {
+            const windowData = windows[windowId];
+            
+            while (windowData.queue.length > 0 && isRunning && !isPaused) {
+                // 获取下一个文件
+                const fileObj = windowData.queue.shift();
+                windowData.currentFile = fileObj;
+                windowData.status = 'processing';
+                windowData.progress = { current: 0, total: 0, percent: 0 };
+                windowData.error = null;
+                
+                updateWindowUI(windowId);
+                recalculateStats();
+                updateStats();
+                
+                addLog(`窗口${windowId + 1}: 开始翻译 ${fileObj.name}`, 'info');
+                
+                try {
+                    // 读取文件内容（自动检测编码）
+                    const content = await readFileWithEncoding(fileObj.file);
+                    
+                    // 解析SRT
+                    const subtitles = parseSRT(content);
+                    if (subtitles.length === 0) {
+                        throw new Error('无法解析SRT文件');
+                    }
+                    
+                    windowData.progress.total = subtitles.length;
+                    updateWindowUI(windowId);
+                    
+                    // 分批翻译
+                    const translatedSubs = [];
+                    const batchSize = CONFIG.batchSize;
+                    
+                    for (let i = 0; i < subtitles.length; i += batchSize) {
+                        if (!isRunning || isPaused) break;
+                        
+                        const batch = subtitles.slice(i, i + batchSize);
+                        const texts = batch.map(s => s.text);
+                        
+                        // 更新预览
+                        windowData.preview.original = texts[0].substring(0, 50);
+                        updateWindowUI(windowId);
+                        
+                        // 调用翻译API（带重试）
+                        let translations;
+                        let retries = 3;
+                        
+                        while (retries > 0) {
+                            try {
+                                translations = await translateBatch(texts, windowId);
+                                break;
+                            } catch (err) {
+                                retries--;
+                                if (retries === 0) throw err;
+                                addLog(`窗口${windowId + 1}: API调用失败，重试中...`, 'warning');
+                                await new Promise(r => setTimeout(r, 2000));
+                            }
+                        }
+                        
+                        // 合并翻译结果
+                        for (let j = 0; j < batch.length; j++) {
+                            translatedSubs.push({
+                                ...batch[j],
+                                text: translations[j]
+                            });
+                        }
+                        
+                        // 更新进度
+                        windowData.progress.current = translatedSubs.length;
+                        windowData.progress.percent = Math.round((translatedSubs.length / subtitles.length) * 100);
+                        windowData.preview.translated = translations[0].substring(0, 50);
+                        updateWindowUI(windowId);
+                        
+                        // 短暂延迟避免API限流
+                        if (i + batchSize < subtitles.length) {
+                            await new Promise(r => setTimeout(r, 500));
+                        }
+                    }
+                    
+                    // 生成翻译后的SRT内容
+                    const translatedContent = generateSRT(translatedSubs);
+                    
+                    // 保存文件
+                    const newFileName = fileObj.name.replace(/\.srt$/i, '_中文.srt');
+                    await saveFile(fileObj, newFileName, translatedContent);
+                    
+                    // 标记完成
+                    windowData.status = 'completed';
+                    stats.completed++;
+                    addLog(`窗口${windowId + 1}: ✓ 完成 ${fileObj.name}`, 'success');
+                    
+                } catch (err) {
+                    windowData.status = 'error';
+                    windowData.error = err.message;
+                    stats.failed++;
+                    addLog(`窗口${windowId + 1}: ✗ 失败 ${fileObj.name} - ${err.message}`, 'error');
+                }
+                
+                updateWindowUI(windowId);
+                recalculateStats();
+                updateStats();
+            }
+            
+            // 队列处理完毕，窗口变为空闲
+            if (windowData.queue.length === 0) {
+                windowData.status = 'idle';
+                windowData.currentFile = null;
+                updateWindowUI(windowId);
+            }
+        }
+        
+        // 保存翻译后的文件
+        async function saveFile(fileObj, newFileName, content) {
+            // 尝试使用File System Access API保存到原位置
+            if (fileObj.dirHandle) {
+                try {
+                    const newHandle = await fileObj.dirHandle.getFileHandle(newFileName, { create: true });
+                    const writable = await newHandle.createWritable();
+                    await writable.write(content);
+                    await writable.close();
+                    return;
+                } catch (err) {
+                    addLog(`保存到原位置失败，将下载文件`, 'warning');
+                }
+            }
+            
+            // 降级：触发下载
+            const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = newFileName;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+        
+        // 开始翻译（启动所有窗口并行处理）
+        async function startTranslation() {
+            if (isRunning) return;
+            
+            readConfig();
+            
+            // 验证配置
+            if (!CONFIG.apiUrl || !CONFIG.apiKey || !CONFIG.model) {
+                addLog('请先配置API地址、密钥和模型', 'error');
+                return;
+            }
+            
+            // 检查是否有待处理文件
+            const totalPending = windows.reduce((sum, w) => sum + w.queue.length, 0);
+            if (totalPending === 0) {
+                addLog('没有待处理的文件', 'warning');
+                return;
+            }
+            
+            isRunning = true;
+            isPaused = false;
+            
+            document.getElementById('btnStart').disabled = true;
+            document.getElementById('btnPause').disabled = false;
+            
+            addLog(`开始并行翻译，共 ${totalPending} 个文件`, 'info');
+            
+            // 启动所有窗口的处理任务（真正的并行）
+            const promises = windows.map((w, i) => processWindow(i));
+            
+            // 等待所有窗口完成
+            await Promise.all(promises);
+            
+            isRunning = false;
+            document.getElementById('btnStart').disabled = false;
+            document.getElementById('btnPause').disabled = true;
+            document.getElementById('btnPause').textContent = '⏸️ 暂停';
+            
+            addLog(`翻译任务完成！成功: ${stats.completed}, 失败: ${stats.failed}`, 'success');
+        }
+        
+        // 暂停/继续（占位函数，第三步实现）
+        function togglePause() {
+            isPaused = !isPaused;
+            const btn = document.getElementById('btnPause');
+            btn.textContent = isPaused ? '▶️ 继续' : '⏸️ 暂停';
+            addLog(isPaused ? '翻译已暂停' : '翻译已继续', 'warning');
+        }
+        
+        // 清空所有队列
+        function clearAllQueues() {
+            windows.forEach(w => {
+                w.queue = [];
+                w.currentFile = null;
+                w.status = 'idle';
+                w.progress = { current: 0, total: 0, percent: 0 };
+                w.preview = { original: '', translated: '' };
+            });
+            stats = { pending: 0, processing: 0, completed: 0, failed: 0 };
+            renderWindows();
+            updateStats();
+            addLog('已清空所有队列', 'warning');
+        }
+        
+        // ==================== 第二步：文件拖放与分发系统 ====================
+        
+        // 选择文件
+        async function selectFiles() {
+            try {
+                // 使用File System Access API选择多个文件
+                const fileHandles = await window.showOpenFilePicker({
+                    multiple: true,
+                    types: [{
+                        description: 'SRT字幕文件',
+                        accept: { 'text/plain': ['.srt'] }
+                    }]
                 });
                 
-                if (!resp.ok) throw new Error(`API ${resp.status}`);
-                
-                const data = await resp.json();
-                const lines = data.choices[0].message.content.split('\n');
-                
-                for (let line of lines) {
-                    const m = line.match(/\[(\d+)\]\s*(.+)/);
-                    if (m) {
-                        const idx = parseInt(m[1]) - 1;
-                        if (idx >= 0 && idx < batch.length) {
-                            result.push({ ...batch[idx], text: m[2].trim() });
-                        }
-                    }
-                }
-                
-                // 填充
-                while (result.length < i + batch.length) {
-                    const idx = result.length - i;
-                    if (idx < batch.length) result.push({ ...batch[idx] });
-                    else break;
-                }
-            }
-            
-            return result.map(s => `${s.index}\n${s.start} --> ${s.end}\n${s.text}`).join('\n\n');
-        }
-        
-        function parseSRT(content) {
-            const result = [];
-            const blocks = content.trim().split(/\n\s*\n/);
-            for (const b of blocks) {
-                const lines = b.trim().split('\n');
-                if (lines.length >= 3) {
-                    const idx = parseInt(lines[0]);
-                    const tm = lines[1].match(/(\d{2}:\d{2}:\d{2},\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2},\d{3})/);
-                    if (tm && !isNaN(idx)) {
-                        result.push({ index: idx, start: tm[1], end: tm[2], text: lines.slice(2).join('\n') });
-                    }
-                }
-            }
-            return result;
-        }
-        
-        function stopTranslation() {
-            shouldStop = true;
-            addLog('正在停止...', 'warning');
-        }
-        
-        function addLog(msg, type = 'info') {
-            const t = new Date().toLocaleTimeString();
-            const el = document.createElement('div');
-            el.className = `log-entry ${type}`;
-            el.textContent = `[${t}] ${msg}`;
-            document.getElementById('logArea').appendChild(el);
-            document.getElementById('logArea').scrollTop = 99999;
-        }
-        
-        // 初始化 API 地址
-        initApiUrl();
-        addLog('工具已就绪，请选择文件夹或拖拽SRT文件', 'info');
-        
-        // 拖拽功能
-        const dropArea = document.getElementById('dropArea');
-        
-        dropArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            dropArea.style.borderColor = '#00ff88';
-            dropArea.style.background = 'rgba(0, 255, 136, 0.1)';
-        });
-        
-        dropArea.addEventListener('dragleave', (e) => {
-            e.preventDefault();
-            dropArea.style.borderColor = 'rgba(0, 212, 255, 0.5)';
-            dropArea.style.background = 'transparent';
-        });
-        
-        dropArea.addEventListener('drop', async (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            dropArea.style.borderColor = 'rgba(0, 212, 255, 0.5)';
-            dropArea.style.background = 'transparent';
-            
-            addLog('检测到拖拽事件...', 'info');
-            
-            files = [];
-            rootHandle = null;
-            scanStats = { total: 0, skipped: 0, added: 0 };
-            const items = e.dataTransfer.items;
-            const filterByName = document.getElementById('filterByName').checked;
-            
-            addLog(`拖入了 ${items.length} 个项目`, 'info');
-            document.getElementById('statusText').textContent = '正在检测文件...';
-            
-            // 先同步收集所有 handles（因为 DataTransferItemList 在异步后会失效）
-            const handlePromises = [];
-            const fallbackFiles = [];
-            
-            for (let i = 0; i < items.length; i++) {
-                const item = items[i];
-                if (item.kind === 'file') {
-                    if (item.getAsFileSystemHandle) {
-                        // 同步启动所有 Promise
-                        handlePromises.push(item.getAsFileSystemHandle());
-                    } else {
-                        // 降级：同步获取文件
-                        const file = item.getAsFile();
-                        if (file) fallbackFiles.push(file);
-                    }
-                }
-            }
-            
-            // 等待所有 handles
-            const handles = await Promise.all(handlePromises);
-            addLog(`获取到 ${handles.length} 个文件系统句柄`, 'info');
-            
-            // 收集所有文件夹名称
-            let folderNames = [];
-            
-            // 处理 handles
-            for (const handle of handles) {
-                if (handle && handle.kind === 'directory') {
-                    if (!rootHandle) {
-                        rootHandle = handle;
-                    }
-                    folderNames.push(handle.name);
-                    addLog(`扫描文件夹: ${handle.name}`, 'success');
-                    await scanDirectory(handle, handle.name + '/', filterByName);
-                } else if (handle && handle.kind === 'file' && handle.name.toLowerCase().endsWith('.srt')) {
-                    const isTranslatedFile = handle.name.includes('_中文');
-                    if (!isTranslatedFile) {
-                        scanStats.total++;
-                        document.getElementById('statusText').textContent = `正在检测... 已检测 ${scanStats.total} 个文件`;
-                        
-                        if (filterByName && !shouldTranslate(handle.name)) {
-                            scanStats.skipped++;
-                            addLog(`跳过: ${handle.name}（文件名不含日语/韩语）`, 'warning');
-                            continue;
-                        }
-                        
-                        files.push({
-                            handle: handle,
-                            dirHandle: null,
-                            path: '',
-                            name: handle.name,
-                            status: 'pending'
-                        });
-                        scanStats.added++;
-                        addLog(`添加文件: ${handle.name}`, 'success');
-                    }
-                }
-            }
-            
-            // 处理降级文件
-            for (const file of fallbackFiles) {
-                const isTranslatedFile = file.name.includes('_中文');
-                if (file.name.toLowerCase().endsWith('.srt') && !isTranslatedFile) {
-                    scanStats.total++;
-                    document.getElementById('statusText').textContent = `正在检测... 已检测 ${scanStats.total} 个文件`;
-                    
-                    if (filterByName && !shouldTranslate(file.name)) {
-                        scanStats.skipped++;
-                        addLog(`跳过: ${file.name}（文件名不含日语/韩语）`, 'warning');
-                        continue;
-                    }
-                    
+                const files = [];
+                for (const handle of fileHandles) {
+                    const file = await handle.getFile();
                     files.push({
-                        handle: null,
                         file: file,
-                        dirHandle: null,
-                        path: '',
+                        handle: handle,
                         name: file.name,
-                        status: 'pending'
+                        dirHandle: null  // 单文件选择没有目录句柄
                     });
-                    scanStats.added++;
-                    addLog(`添加文件(只读): ${file.name}`, 'warning');
+                }
+                
+                if (files.length > 0) {
+                    distributeFiles(files);
+                }
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    addLog(`选择文件失败: ${err.message}`, 'error');
                 }
             }
+        }
+        
+        // 初始化拖放事件
+        function initDragDrop() {
+            const dropZone = document.getElementById('dropZone');
             
-            // 更新文件夹显示
-            if (folderNames.length > 0) {
-                document.getElementById('folderName').textContent = folderNames.length === 1
-                    ? folderNames[0]
-                    : `${folderNames.length} 个文件夹: ${folderNames.join(', ')}`;
-                document.getElementById('folderPath').style.display = 'block';
+            // 阻止默认拖放行为
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                });
+            });
+            
+            // 拖入效果
+            dropZone.addEventListener('dragenter', () => {
+                dropZone.classList.add('dragover');
+            });
+            
+            dropZone.addEventListener('dragover', () => {
+                dropZone.classList.add('dragover');
+            });
+            
+            dropZone.addEventListener('dragleave', (e) => {
+                // 只有真正离开dropZone时才移除效果
+                if (!dropZone.contains(e.relatedTarget)) {
+                    dropZone.classList.remove('dragover');
+                }
+            });
+            
+            // 处理文件放下
+            dropZone.addEventListener('drop', async (e) => {
+                dropZone.classList.remove('dragover');
+                
+                const items = e.dataTransfer.items;
+                const files = [];
+                
+                addLog(`检测到拖入 ${items.length} 个项目...`, 'info');
+                
+                // 收集所有文件
+                const processPromises = [];
+                
+                for (let i = 0; i < items.length; i++) {
+                    const item = items[i];
+                    if (item.kind === 'file') {
+                        // 尝试获取文件系统句柄（支持文件夹）
+                        if (item.getAsFileSystemHandle) {
+                            processPromises.push(
+                                item.getAsFileSystemHandle().then(handle => 
+                                    processHandle(handle, files)
+                                ).catch(err => {
+                                    // 降级处理
+                                    const file = item.getAsFile();
+                                    if (file && file.name.toLowerCase().endsWith('.srt')) {
+                                        files.push({
+                                            file: file,
+                                            handle: null,
+                                            name: file.name,
+                                            dirHandle: null
+                                        });
+                                    }
+                                })
+                            );
+                        } else {
+                            // 不支持getAsFileSystemHandle，直接获取文件
+                            const file = item.getAsFile();
+                            if (file && file.name.toLowerCase().endsWith('.srt')) {
+                                files.push({
+                                    file: file,
+                                    handle: null,
+                                    name: file.name,
+                                    dirHandle: null
+                                });
+                            }
+                        }
+                    }
+                }
+                
+                // 等待所有处理完成
+                await Promise.all(processPromises);
+                
+                if (files.length > 0) {
+                    addLog(`共找到 ${files.length} 个SRT文件`, 'success');
+                    distributeFiles(files);
+                } else {
+                    addLog('未找到SRT文件', 'warning');
+                }
+            });
+        }
+        
+        // 处理文件系统句柄（支持文件夹递归）
+        async function processHandle(handle, files, dirHandle = null) {
+            if (handle.kind === 'file') {
+                if (handle.name.toLowerCase().endsWith('.srt')) {
+                    const file = await handle.getFile();
+                    files.push({
+                        file: file,
+                        handle: handle,
+                        name: file.name,
+                        dirHandle: dirHandle
+                    });
+                }
+            } else if (handle.kind === 'directory') {
+                // 递归处理文件夹
+                addLog(`扫描文件夹: ${handle.name}`, 'info');
+                for await (const entry of handle.values()) {
+                    await processHandle(entry, files, handle);
+                }
             }
+        }
+        
+        // 智能分发文件到各窗口
+        function distributeFiles(files) {
+            addLog(`开始分发 ${files.length} 个文件到各窗口...`, 'info');
             
-            updateFileList();
-            document.getElementById('startBtn').disabled = files.length === 0;
+            // 使用负载均衡算法：优先分配给队列最短的窗口
+            files.forEach((fileObj, index) => {
+                // 找到队列最短的窗口
+                let minQueueWindow = windows[0];
+                let minQueueLength = windows[0].queue.length;
+                
+                for (let i = 1; i < windows.length; i++) {
+                    if (windows[i].queue.length < minQueueLength) {
+                        minQueueLength = windows[i].queue.length;
+                        minQueueWindow = windows[i];
+                    }
+                }
+                
+                // 将文件添加到该窗口的队列
+                minQueueWindow.queue.push(fileObj);
+                
+                // 更新窗口显示
+                updateWindowUI(minQueueWindow.id);
+            });
             
-            if (filterByName && scanStats.skipped > 0) {
-                addLog(`检测完成: 共 ${scanStats.total} 个SRT文件，${scanStats.skipped} 个已跳过（文件名不含日语/韩语），${scanStats.added} 个待翻译`, 'info');
-            } else {
-                addLog(`共找到 ${files.length} 个SRT文件`, 'info');
-            }
-            document.getElementById('statusText').textContent = files.length > 0 ? '准备就绪，点击开始翻译' : '未找到需要翻译的文件';
+            // 更新统计
+            recalculateStats();
+            updateStats();
+            
+            addLog(`文件分发完成，已分配到 ${CONFIG.windowCount} 个窗口`, 'success');
+            
+            // 显示各窗口队列情况
+            const queueInfo = windows.map((w, i) => `W${i+1}:${w.queue.length}`).join(' ');
+            addLog(`各窗口队列: ${queueInfo}`, 'info');
+        }
+        
+        // 重新计算统计数据
+        function recalculateStats() {
+            stats.pending = 0;
+            stats.processing = 0;
+            stats.completed = 0;
+            stats.failed = 0;
+            
+            windows.forEach(w => {
+                // 队列中的文件算作待处理
+                stats.pending += w.queue.length;
+                
+                // 当前正在处理的文件
+                if (w.status === 'processing' && w.currentFile) {
+                    stats.processing++;
+                }
+            });
+        }
+        
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            initWindows();
+            renderWindows();
+            updateStats();
+            initEventListeners();
+            initDragDrop();  // 初始化拖放功能
+            addLog('系统初始化完成，20个翻译窗口已就绪', 'success');
+            addLog('请拖拽SRT文件到上方区域开始处理', 'info');
         });
     </script>
 </body>
