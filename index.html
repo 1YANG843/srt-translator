@@ -342,140 +342,37 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
         
-        /* 文件夹浏览器弹窗 */
-        .folder-browser-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            z-index: 1000;
-            justify-content: center;
+        /* 子文件夹选择项样式 */
+        .subfolder-item {
+            display: inline-flex;
             align-items: center;
-        }
-        .folder-browser-overlay.show {
-            display: flex;
-        }
-        .folder-browser-modal {
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            border-radius: 15px;
-            padding: 25px;
-            width: 90%;
-            max-width: 800px;
-            max-height: 80vh;
-            border: 2px solid #00d4ff;
-            box-shadow: 0 0 30px rgba(0, 212, 255, 0.3);
-        }
-        .folder-browser-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid rgba(0, 212, 255, 0.3);
-        }
-        .folder-browser-title {
-            color: #00d4ff;
-            font-size: 1.3em;
-            font-weight: bold;
-        }
-        .folder-browser-close {
-            background: none;
-            border: none;
-            color: #888;
-            font-size: 1.5em;
-            cursor: pointer;
-            padding: 5px 10px;
-        }
-        .folder-browser-close:hover {
-            color: #ff4444;
-        }
-        .folder-browser-path {
-            background: rgba(0, 0, 0, 0.3);
-            padding: 10px 15px;
-            border-radius: 8px;
-            margin-bottom: 15px;
-            color: #00ff88;
-            font-family: 'Consolas', monospace;
-            font-size: 0.9em;
-        }
-        .folder-browser-list {
-            max-height: 400px;
-            overflow-y: auto;
-            background: rgba(0, 0, 0, 0.2);
-            border-radius: 10px;
-            padding: 10px;
-            margin-bottom: 15px;
-        }
-        .folder-item {
-            display: flex;
-            align-items: center;
-            padding: 12px 15px;
-            margin: 5px 0;
+            padding: 8px 15px;
             background: rgba(0, 0, 0, 0.3);
             border-radius: 8px;
             cursor: pointer;
             transition: all 0.2s;
             border: 2px solid transparent;
+            color: #e0e0e0;
         }
-        .folder-item:hover {
+        .subfolder-item:hover {
             background: rgba(0, 212, 255, 0.1);
             border-color: rgba(0, 212, 255, 0.3);
         }
-        .folder-item.selected {
+        .subfolder-item.selected {
             background: rgba(0, 255, 136, 0.2);
             border-color: #00ff88;
-        }
-        .folder-item .folder-icon {
-            font-size: 1.5em;
-            margin-right: 12px;
-        }
-        .folder-item .folder-name {
-            flex: 1;
-            color: #e0e0e0;
-            font-size: 1em;
-        }
-        .folder-item.selected .folder-name {
             color: #00ff88;
-            font-weight: bold;
         }
-        .folder-item .folder-check {
-            color: #00ff88;
-            font-size: 1.2em;
+        .subfolder-item .icon {
+            margin-right: 8px;
+            font-size: 1.1em;
+        }
+        .subfolder-item .check {
+            margin-left: 8px;
             display: none;
         }
-        .folder-item.selected .folder-check {
-            display: block;
-        }
-        .folder-browser-footer {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding-top: 15px;
-            border-top: 1px solid rgba(0, 212, 255, 0.3);
-        }
-        .folder-browser-info {
-            color: #888;
-            font-size: 0.9em;
-        }
-        .folder-browser-info .count {
-            color: #00ff88;
-            font-weight: bold;
-        }
-        .folder-browser-actions {
-            display: flex;
-            gap: 10px;
-        }
-        .folder-browser-empty {
-            text-align: center;
-            padding: 40px;
-            color: #888;
-        }
-        .folder-browser-empty .icon {
-            font-size: 3em;
-            margin-bottom: 15px;
+        .subfolder-item.selected .check {
+            display: inline;
         }
     </style>
 </head>
@@ -521,22 +418,22 @@
             <div class="drop-zone-text">拖拽SRT文件到此处</div>
             <div class="drop-zone-hint">支持批量拖入多个文件夹，自动分配到空闲窗口处理</div>
             <div style="margin-top: 15px;">
-                <button class="btn-primary" onclick="openFolderBrowser()" style="padding: 10px 20px; font-size: 14px;">
-                    📁 浏览文件夹（多选）
-                </button>
-                <button class="btn-secondary" onclick="scanAllFolders()" style="padding: 10px 20px; font-size: 14px; margin-left: 10px;">
-                    🔍 扫描已添加的文件夹
+                <button class="btn-primary" onclick="selectRootAndShowFolders()" style="padding: 10px 20px; font-size: 14px;">
+                    📁 选择文件夹（多选子目录）
                 </button>
             </div>
         </div>
         
-        <!-- 已添加的文件夹列表 -->
-        <div id="folderListPanel" style="display: none; background: rgba(0,0,0,0.3); border-radius: 10px; padding: 15px; margin-bottom: 15px; border: 1px solid rgba(0, 212, 255, 0.3);">
+        <!-- 子文件夹选择区域（直接显示在页面上） -->
+        <div id="subfolderSelectPanel" style="display: none; background: rgba(0,0,0,0.3); border-radius: 10px; padding: 15px; margin-bottom: 15px; border: 1px solid rgba(0, 212, 255, 0.3);">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <span style="color: #00d4ff; font-size: 1em;">📁 已添加的文件夹 (<span id="folderCount">0</span>个)</span>
-                <button class="btn-danger" onclick="clearAllFolders()" style="padding: 5px 15px; font-size: 12px;">清空全部</button>
+                <span style="color: #00d4ff; font-size: 1em;">📁 <span id="rootFolderName">根目录</span> - 点击选择要翻译的文件夹</span>
+                <div>
+                    <span style="color: #00ff88; margin-right: 15px;">已选 <span id="selectedCount">0</span> 个</span>
+                    <button class="btn-primary" onclick="confirmAndScan()" id="btnConfirmFolders" disabled style="padding: 8px 15px; font-size: 13px;">✓ 确认并扫描</button>
+                </div>
             </div>
-            <div id="addedFoldersList" style="max-height: 150px; overflow-y: auto;"></div>
+            <div id="subfolderList" style="max-height: 200px; overflow-y: auto; display: flex; flex-wrap: wrap; gap: 8px;"></div>
         </div>
         
         <!-- 队列状态栏 -->
@@ -575,32 +472,6 @@
         <div class="log-panel">
             <div class="log-title">📝 运行日志</div>
             <div class="log-area" id="logArea"></div>
-        </div>
-    </div>
-    
-    <!-- 文件夹浏览器弹窗 -->
-    <div class="folder-browser-overlay" id="folderBrowserOverlay">
-        <div class="folder-browser-modal">
-            <div class="folder-browser-header">
-                <span class="folder-browser-title">📂 选择要翻译的文件夹</span>
-                <button class="folder-browser-close" onclick="closeFolderBrowser()">✕</button>
-            </div>
-            <div class="folder-browser-path" id="browserRootPath">请先选择根目录...</div>
-            <div class="folder-browser-list" id="folderBrowserList">
-                <div class="folder-browser-empty">
-                    <div class="icon">📁</div>
-                    <div>点击下方按钮选择根目录</div>
-                </div>
-            </div>
-            <div class="folder-browser-footer">
-                <div class="folder-browser-info">
-                    已选择 <span class="count" id="selectedFolderCount">0</span> 个文件夹
-                </div>
-                <div class="folder-browser-actions">
-                    <button class="btn-secondary" onclick="selectRootDirectory()">📁 选择根目录</button>
-                    <button class="btn-primary" onclick="addSelectedFolders()" id="btnAddSelected" disabled>✓ 添加选中的文件夹</button>
-                </div>
-            </div>
         </div>
     </div>
 
@@ -1220,42 +1091,42 @@ ${numberedTexts}`
             addLog('已清空所有队列', 'warning');
         }
         
-        // ==================== 文件夹浏览器功能 ====================
+        // ==================== 文件夹选择功能（直接在页面显示） ====================
         
-        // 浏览器状态
-        let browserRootHandle = null;  // 根目录句柄
-        let browserSubfolders = [];    // 子文件夹列表 [{handle, name, selected}]
+        // 根目录句柄
+        let rootDirHandle = null;
+        // 子文件夹列表 [{handle, name, selected}]
+        let subfolders = [];
         
-        // 已添加的文件夹列表
-        let addedFolders = [];  // [{handle, name, path}]
-        
-        // 打开文件夹浏览器弹窗
-        function openFolderBrowser() {
-            document.getElementById('folderBrowserOverlay').classList.add('show');
-            // 如果之前没有选择过根目录，自动触发选择
-            if (!browserRootHandle) {
-                // 不自动触发，让用户点击按钮
-            }
-        }
-        
-        // 关闭文件夹浏览器弹窗
-        function closeFolderBrowser() {
-            document.getElementById('folderBrowserOverlay').classList.remove('show');
-        }
-        
-        // 选择根目录
-        async function selectRootDirectory() {
+        // 选择根目录并显示子文件夹
+        async function selectRootAndShowFolders() {
             try {
                 const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
-                browserRootHandle = dirHandle;
-                
-                // 更新路径显示
-                document.getElementById('browserRootPath').textContent = `📁 ${dirHandle.name}`;
+                rootDirHandle = dirHandle;
                 
                 // 扫描子文件夹
-                await scanSubfolders(dirHandle);
+                subfolders = [];
+                for await (const entry of dirHandle.values()) {
+                    if (entry.kind === 'directory') {
+                        subfolders.push({
+                            handle: entry,
+                            name: entry.name,
+                            selected: false
+                        });
+                    }
+                }
                 
-                addLog(`已选择根目录: ${dirHandle.name}`, 'success');
+                // 按名称排序
+                subfolders.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
+                
+                // 显示面板
+                document.getElementById('subfolderSelectPanel').style.display = 'block';
+                document.getElementById('rootFolderName').textContent = dirHandle.name;
+                
+                // 渲染子文件夹列表
+                renderSubfolderList();
+                
+                addLog(`已选择根目录: ${dirHandle.name}，共 ${subfolders.length} 个子文件夹`, 'success');
             } catch (err) {
                 if (err.name !== 'AbortError') {
                     addLog(`选择目录失败: ${err.message}`, 'error');
@@ -1263,61 +1134,34 @@ ${numberedTexts}`
             }
         }
         
-        // 扫描子文件夹
-        async function scanSubfolders(dirHandle) {
-            browserSubfolders = [];
+        // 渲染子文件夹列表
+        function renderSubfolderList() {
+            const listEl = document.getElementById('subfolderList');
             
-            for await (const entry of dirHandle.values()) {
-                if (entry.kind === 'directory') {
-                    browserSubfolders.push({
-                        handle: entry,
-                        name: entry.name,
-                        selected: false
-                    });
-                }
-            }
-            
-            // 按名称排序
-            browserSubfolders.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
-            
-            // 更新UI
-            renderFolderBrowserList();
-        }
-        
-        // 渲染文件夹列表
-        function renderFolderBrowserList() {
-            const listEl = document.getElementById('folderBrowserList');
-            
-            if (browserSubfolders.length === 0) {
-                listEl.innerHTML = `
-                    <div class="folder-browser-empty">
-                        <div class="icon">📭</div>
-                        <div>该目录下没有子文件夹</div>
-                        <div style="margin-top: 10px; font-size: 0.9em; color: #666;">请选择包含子文件夹的目录</div>
-                    </div>
-                `;
+            if (subfolders.length === 0) {
+                listEl.innerHTML = '<div style="color: #888; padding: 20px; text-align: center;">该目录下没有子文件夹</div>';
                 return;
             }
             
-            listEl.innerHTML = browserSubfolders.map((folder, index) => `
-                <div class="folder-item ${folder.selected ? 'selected' : ''}" onclick="toggleFolderSelection(${index})">
-                    <span class="folder-icon">📁</span>
-                    <span class="folder-name">${folder.name}</span>
-                    <span class="folder-check">✓</span>
+            listEl.innerHTML = subfolders.map((folder, index) => `
+                <div class="subfolder-item ${folder.selected ? 'selected' : ''}" onclick="toggleSubfolder(${index})">
+                    <span class="icon">📁</span>
+                    <span>${folder.name}</span>
+                    <span class="check">✓</span>
                 </div>
             `).join('');
             
             updateSelectedCount();
         }
         
-        // 切换文件夹选中状态
-        function toggleFolderSelection(index) {
-            browserSubfolders[index].selected = !browserSubfolders[index].selected;
+        // 切换子文件夹选中状态
+        function toggleSubfolder(index) {
+            subfolders[index].selected = !subfolders[index].selected;
             
-            // 更新单个元素的样式（不重新渲染整个列表，更流畅）
-            const items = document.querySelectorAll('.folder-item');
+            // 更新单个元素样式
+            const items = document.querySelectorAll('.subfolder-item');
             if (items[index]) {
-                items[index].classList.toggle('selected', browserSubfolders[index].selected);
+                items[index].classList.toggle('selected', subfolders[index].selected);
             }
             
             updateSelectedCount();
@@ -1325,104 +1169,25 @@ ${numberedTexts}`
         
         // 更新选中数量
         function updateSelectedCount() {
-            const count = browserSubfolders.filter(f => f.selected).length;
-            document.getElementById('selectedFolderCount').textContent = count;
-            document.getElementById('btnAddSelected').disabled = count === 0;
+            const count = subfolders.filter(f => f.selected).length;
+            document.getElementById('selectedCount').textContent = count;
+            document.getElementById('btnConfirmFolders').disabled = count === 0;
         }
         
-        // 添加选中的文件夹到列表
-        async function addSelectedFolders() {
-            const selectedFolders = browserSubfolders.filter(f => f.selected);
+        // 确认选择并扫描
+        async function confirmAndScan() {
+            const selectedFolders = subfolders.filter(f => f.selected);
             
             if (selectedFolders.length === 0) {
-                addLog('请先选择要添加的文件夹', 'warning');
+                addLog('请先选择要翻译的文件夹', 'warning');
                 return;
             }
             
-            let addedCount = 0;
-            for (const folder of selectedFolders) {
-                // 检查是否已添加
-                const exists = addedFolders.some(f => f.name === folder.name);
-                if (!exists) {
-                    addedFolders.push({
-                        handle: folder.handle,
-                        name: folder.name
-                    });
-                    addedCount++;
-                }
-            }
-            
-            if (addedCount > 0) {
-                addLog(`✓ 已添加 ${addedCount} 个文件夹`, 'success');
-            } else {
-                addLog('所选文件夹已在列表中', 'warning');
-            }
-            
-            // 清除选中状态
-            browserSubfolders.forEach(f => f.selected = false);
-            renderFolderBrowserList();
-            
-            // 更新已添加文件夹列表UI
-            updateFolderListUI();
-            
-            // 关闭弹窗
-            closeFolderBrowser();
-            
-            // 自动扫描所有已添加的文件夹
-            if (addedCount > 0) {
-                await scanAllFolders();
-            }
-        }
-        
-        // 更新文件夹列表UI
-        function updateFolderListUI() {
-            const panel = document.getElementById('folderListPanel');
-            const list = document.getElementById('addedFoldersList');
-            const count = document.getElementById('folderCount');
-            
-            if (addedFolders.length === 0) {
-                panel.style.display = 'none';
-                return;
-            }
-            
-            panel.style.display = 'block';
-            count.textContent = addedFolders.length;
-            
-            list.innerHTML = addedFolders.map((folder, index) => `
-                <div style="display: flex; align-items: center; padding: 8px 12px; margin: 4px 0; background: rgba(0, 212, 255, 0.1); border-radius: 6px; border: 1px solid rgba(0, 212, 255, 0.3);">
-                    <span style="font-size: 1.2em; margin-right: 10px;">📁</span>
-                    <span style="flex: 1; color: #e0e0e0;">${folder.name}</span>
-                    <button onclick="removeFolderFromList(${index})" style="background: rgba(255,68,68,0.3); border: none; color: #ff4444; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px;">✕ 移除</button>
-                </div>
-            `).join('');
-        }
-        
-        // 从列表中移除文件夹
-        function removeFolderFromList(index) {
-            const removed = addedFolders.splice(index, 1)[0];
-            addLog(`已移除文件夹: ${removed.name}`, 'warning');
-            updateFolderListUI();
-        }
-        
-        // 清空所有文件夹
-        function clearAllFolders() {
-            addedFolders = [];
-            updateFolderListUI();
-            addLog('已清空所有文件夹', 'warning');
-        }
-        
-        // 扫描所有已添加的文件夹
-        async function scanAllFolders() {
-            if (addedFolders.length === 0) {
-                addLog('请先添加文件夹', 'warning');
-                return;
-            }
-            
-            addLog(`开始扫描 ${addedFolders.length} 个文件夹...`, 'info');
+            addLog(`开始扫描 ${selectedFolders.length} 个文件夹...`, 'info');
             
             const files = [];
             
-            for (const folder of addedFolders) {
+            for (const folder of selectedFolders) {
                 addLog(`扫描: ${folder.name}`, 'info');
                 await scanDirectoryRecursive(folder.handle, files, folder.name + '/');
             }
@@ -1430,6 +1195,10 @@ ${numberedTexts}`
             if (files.length > 0) {
                 addLog(`共找到 ${files.length} 个SRT文件`, 'success');
                 distributeFiles(files);
+                
+                // 清除选中状态
+                subfolders.forEach(f => f.selected = false);
+                renderSubfolderList();
             } else {
                 addLog('未找到SRT文件', 'warning');
             }
