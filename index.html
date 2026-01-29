@@ -382,8 +382,13 @@
         <!-- 文件拖放区域 -->
         <div class="drop-zone" id="dropZone">
             <div class="drop-zone-icon">📂</div>
-            <div class="drop-zone-text">拖拽SRT文件到此处 或 点击选择文件</div>
-            <div class="drop-zone-hint">支持批量拖入多个文件，自动分配到空闲窗口处理</div>
+            <div class="drop-zone-text">拖拽SRT文件到此处</div>
+            <div class="drop-zone-hint">支持批量拖入多个文件夹，自动分配到空闲窗口处理</div>
+            <div style="margin-top: 15px;">
+                <button class="btn-primary" onclick="selectFolderForAutoSave()" style="padding: 10px 20px; font-size: 14px;">
+                    📁 选择文件夹（推荐，可自动保存）
+                </button>
+            </div>
         </div>
         
         <!-- 队列状态栏 -->
@@ -1043,7 +1048,51 @@ ${numberedTexts}`
         
         // ==================== 第二步：文件拖放与分发系统 ====================
         
-        // 选择文件
+        // 选择文件夹（推荐方式，可自动保存）
+        async function selectFolderForAutoSave() {
+            try {
+                const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+                addLog(`已选择文件夹: ${dirHandle.name}`, 'success');
+                
+                const files = [];
+                await scanDirectoryRecursive(dirHandle, files, '');
+                
+                if (files.length > 0) {
+                    addLog(`共找到 ${files.length} 个SRT文件`, 'success');
+                    distributeFiles(files);
+                } else {
+                    addLog('未找到SRT文件', 'warning');
+                }
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    addLog(`选择文件夹失败: ${err.message}`, 'error');
+                }
+            }
+        }
+        
+        // 递归扫描目录（用于选择文件夹方式）
+        async function scanDirectoryRecursive(dirHandle, files, path) {
+            for await (const entry of dirHandle.values()) {
+                if (entry.kind === 'file' && entry.name.toLowerCase().endsWith('.srt')) {
+                    // 跳过已翻译的文件
+                    if (!entry.name.includes('_中文')) {
+                        const file = await entry.getFile();
+                        files.push({
+                            file: file,
+                            handle: entry,
+                            name: entry.name,
+                            dirHandle: dirHandle,  // 保存目录句柄用于自动保存
+                            path: path
+                        });
+                        addLog(`添加文件: ${path}${entry.name}`, 'success');
+                    }
+                } else if (entry.kind === 'directory') {
+                    await scanDirectoryRecursive(entry, files, path + entry.name + '/');
+                }
+            }
+        }
+        
+        // 选择文件（单文件选择，无法自动保存）
         async function selectFiles() {
             try {
                 // 使用File System Access API选择多个文件
