@@ -1144,24 +1144,47 @@ ${numberedTexts}`
             }
             
             listEl.innerHTML = subfolders.map((folder, index) => `
-                <div class="subfolder-item ${folder.selected ? 'selected' : ''}" onclick="toggleSubfolder(${index})">
+                <div class="subfolder-item ${folder.selected ? 'selected' : ''}" data-index="${index}">
                     <span class="icon">📁</span>
-                    <span>${folder.name}</span>
+                    <span class="folder-name">${folder.name}</span>
                     <span class="check">✓</span>
                 </div>
             `).join('');
+            
+            // 使用事件委托绑定点击事件
+            listEl.querySelectorAll('.subfolder-item').forEach(item => {
+                item.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const idx = parseInt(this.getAttribute('data-index'));
+                    toggleSubfolder(idx);
+                });
+            });
             
             updateSelectedCount();
         }
         
         // 切换子文件夹选中状态
         function toggleSubfolder(index) {
+            // 确保index有效
+            if (index < 0 || index >= subfolders.length) {
+                console.error('无效的索引:', index);
+                return;
+            }
+            
+            // 切换选中状态
             subfolders[index].selected = !subfolders[index].selected;
             
+            console.log(`文件夹 ${subfolders[index].name} 选中状态: ${subfolders[index].selected}`);
+            
             // 更新单个元素样式
-            const items = document.querySelectorAll('.subfolder-item');
-            if (items[index]) {
-                items[index].classList.toggle('selected', subfolders[index].selected);
+            const item = document.querySelector(`.subfolder-item[data-index="${index}"]`);
+            if (item) {
+                if (subfolders[index].selected) {
+                    item.classList.add('selected');
+                } else {
+                    item.classList.remove('selected');
+                }
             }
             
             updateSelectedCount();
