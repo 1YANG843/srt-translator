@@ -949,13 +949,20 @@ ${numberedTexts}`
             // 尝试使用File System Access API保存到原位置
             if (fileObj.dirHandle) {
                 try {
-                    const newHandle = await fileObj.dirHandle.getFileHandle(newFileName, { create: true });
-                    const writable = await newHandle.createWritable();
-                    await writable.write(content);
-                    await writable.close();
-                    return;
+                    // 先请求写入权限
+                    const permission = await fileObj.dirHandle.requestPermission({ mode: 'readwrite' });
+                    if (permission === 'granted') {
+                        const newHandle = await fileObj.dirHandle.getFileHandle(newFileName, { create: true });
+                        const writable = await newHandle.createWritable();
+                        await writable.write(content);
+                        await writable.close();
+                        addLog(`✓ 已保存到原位置: ${newFileName}`, 'success');
+                        return;
+                    } else {
+                        addLog(`权限被拒绝，将下载文件`, 'warning');
+                    }
                 } catch (err) {
-                    addLog(`保存到原位置失败，将下载文件`, 'warning');
+                    addLog(`保存到原位置失败: ${err.message}，将下载文件`, 'warning');
                 }
             }
             
@@ -967,6 +974,7 @@ ${numberedTexts}`
             a.download = newFileName;
             a.click();
             URL.revokeObjectURL(url);
+            addLog(`✓ 已下载: ${newFileName}`, 'success');
         }
         
         // 开始翻译（启动所有窗口并行处理）
@@ -1160,18 +1168,24 @@ ${numberedTexts}`
         async function processHandle(handle, files, dirHandle = null) {
             if (handle.kind === 'file') {
                 if (handle.name.toLowerCase().endsWith('.srt')) {
-                    const file = await handle.getFile();
-                    files.push({
-                        file: file,
-                        handle: handle,
-                        name: file.name,
-                        dirHandle: dirHandle
-                    });
+                    // 跳过已翻译的文件
+                    if (!handle.name.includes('_中文')) {
+                        const file = await handle.getFile();
+                        files.push({
+                            file: file,
+                            handle: handle,
+                            name: file.name,
+                            dirHandle: dirHandle  // 保存文件所在的目录句柄
+                        });
+                        addLog(`添加文件: ${handle.name} (目录: ${dirHandle ? dirHandle.name : '无'})`, 'success');
+                    }
                 }
             } else if (handle.kind === 'directory') {
-                // 递归处理文件夹
+                // 递归处理文件夹，传递当前目录作为子文件的dirHandle
                 addLog(`扫描文件夹: ${handle.name}`, 'info');
                 for await (const entry of handle.values()) {
+                    // 对于文件，传递当前目录handle作为dirHandle
+                    // 对于子目录，递归时会更新dirHandle
                     await processHandle(entry, files, handle);
                 }
             }
