@@ -385,9 +385,34 @@
             <div class="drop-zone-text">拖拽SRT文件到此处</div>
             <div class="drop-zone-hint">支持批量拖入多个文件夹，自动分配到空闲窗口处理</div>
             <div style="margin-top: 15px;">
-                <button class="btn-primary" onclick="selectFolderForAutoSave()" style="padding: 10px 20px; font-size: 14px;">
+                <button class="btn-primary" onclick="openFolderBrowser()" style="padding: 10px 20px; font-size: 14px;">
                     📁 选择文件夹（推荐，可自动保存）
                 </button>
+            </div>
+        </div>
+        
+        <!-- 文件夹浏览器弹窗 -->
+        <div id="folderBrowserModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center;">
+            <div style="background: #1a1a2e; border-radius: 15px; padding: 20px; width: 90%; max-width: 800px; max-height: 80vh; display: flex; flex-direction: column; border: 2px solid #00d4ff;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid rgba(0,212,255,0.3);">
+                    <h3 style="color: #00d4ff; margin: 0;">📁 选择要翻译的文件夹</h3>
+                    <button onclick="closeFolderBrowser()" style="background: none; border: none; color: #ff4444; font-size: 24px; cursor: pointer;">×</button>
+                </div>
+                <div style="margin-bottom: 10px; color: #888;">
+                    <span id="currentPath">请先选择根目录</span>
+                    <button onclick="selectRootFolder()" class="btn-secondary" style="margin-left: 10px; padding: 5px 15px;">选择根目录</button>
+                </div>
+                <div id="folderList" style="flex: 1; overflow-y: auto; background: rgba(0,0,0,0.3); border-radius: 8px; padding: 10px; min-height: 300px;">
+                    <div style="color: #666; text-align: center; padding: 50px;">请先选择根目录</div>
+                </div>
+                <div style="margin-top: 15px; display: flex; justify-content: space-between; align-items: center;">
+                    <span style="color: #ffaa00;" id="selectedCount">已选择 0 个文件夹</span>
+                    <div>
+                        <button onclick="selectAllFolders()" class="btn-secondary" style="margin-right: 10px;">全选</button>
+                        <button onclick="deselectAllFolders()" class="btn-secondary" style="margin-right: 10px;">取消全选</button>
+                        <button onclick="confirmFolderSelection()" class="btn-primary">确认选择并扫描</button>
+                    </div>
+                </div>
             </div>
         </div>
         
@@ -1046,9 +1071,164 @@ ${numberedTexts}`
             addLog('已清空所有队列', 'warning');
         }
         
+        // ==================== 文件夹浏览器功能 ====================
+        
+        // 文件夹浏览器状态
+        let folderBrowserState = {
+            rootHandle: null,
+            subFolders: [],      // 子文件夹列表 [{handle, name, selected}]
+            selectedFolders: []  // 已选择的文件夹句柄
+        };
+        
+        // 打开文件夹浏览器弹窗
+        function openFolderBrowser() {
+            document.getElementById('folderBrowserModal').style.display = 'flex';
+            // 重置状态
+            folderBrowserState = {
+                rootHandle: null,
+                subFolders: [],
+                selectedFolders: []
+            };
+            updateFolderList();
+            updateSelectedCount();
+        }
+        
+        // 关闭文件夹浏览器弹窗
+        function closeFolderBrowser() {
+            document.getElementById('folderBrowserModal').style.display = 'none';
+        }
+        
+        // 选择根目录
+        async function selectRootFolder() {
+            try {
+                const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+                folderBrowserState.rootHandle = dirHandle;
+                folderBrowserState.subFolders = [];
+                folderBrowserState.selectedFolders = [];
+                
+                document.getElementById('currentPath').textContent = `📁 ${dirHandle.name}`;
+                
+                // 扫描子文件夹
+                for await (const entry of dirHandle.values()) {
+                    if (entry.kind === 'directory') {
+                        folderBrowserState.subFolders.push({
+                            handle: entry,
+                            name: entry.name,
+                            selected: false
+                        });
+                    }
+                }
+                
+                // 按名称排序
+                folderBrowserState.subFolders.sort((a, b) => a.name.localeCompare(b.name));
+                
+                updateFolderList();
+                updateSelectedCount();
+                addLog(`已加载根目录: ${dirHandle.name}，共 ${folderBrowserState.subFolders.length} 个子文件夹`, 'success');
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    addLog(`选择根目录失败: ${err.message}`, 'error');
+                }
+            }
+        }
+        
+        // 更新文件夹列表显示
+        function updateFolderList() {
+            const container = document.getElementById('folderList');
+            
+            if (!folderBrowserState.rootHandle) {
+                container.innerHTML = '<div style="color: #666; text-align: center; padding: 50px;">请先选择根目录</div>';
+                return;
+            }
+            
+            if (folderBrowserState.subFolders.length === 0) {
+                container.innerHTML = '<div style="color: #666; text-align: center; padding: 50px;">该目录下没有子文件夹</div>';
+                return;
+            }
+            
+            container.innerHTML = folderBrowserState.subFolders.map((folder, index) => `
+                <div class="folder-item ${folder.selected ? 'selected' : ''}"
+                     onclick="toggleFolderSelection(${index})"
+                     style="
+                        display: flex;
+                        align-items: center;
+                        padding: 12px 15px;
+                        margin: 5px 0;
+                        background: ${folder.selected ? 'rgba(0, 212, 255, 0.3)' : 'rgba(255, 255, 255, 0.05)'};
+                        border: 2px solid ${folder.selected ? '#00d4ff' : 'transparent'};
+                        border-radius: 8px;
+                        cursor: pointer;
+                        transition: all 0.2s;
+                     "
+                     onmouseover="this.style.background='${folder.selected ? 'rgba(0, 212, 255, 0.4)' : 'rgba(255, 255, 255, 0.1)'}'"
+                     onmouseout="this.style.background='${folder.selected ? 'rgba(0, 212, 255, 0.3)' : 'rgba(255, 255, 255, 0.05)'}'"
+                >
+                    <span style="font-size: 1.5em; margin-right: 10px;">${folder.selected ? '✅' : '📁'}</span>
+                    <span style="color: ${folder.selected ? '#00d4ff' : '#e0e0e0'}; flex: 1;">${folder.name}</span>
+                    ${folder.selected ? '<span style="color: #00ff88; font-size: 0.8em;">已选择</span>' : ''}
+                </div>
+            `).join('');
+        }
+        
+        // 切换文件夹选择状态
+        function toggleFolderSelection(index) {
+            folderBrowserState.subFolders[index].selected = !folderBrowserState.subFolders[index].selected;
+            updateFolderList();
+            updateSelectedCount();
+        }
+        
+        // 全选文件夹
+        function selectAllFolders() {
+            folderBrowserState.subFolders.forEach(f => f.selected = true);
+            updateFolderList();
+            updateSelectedCount();
+        }
+        
+        // 取消全选
+        function deselectAllFolders() {
+            folderBrowserState.subFolders.forEach(f => f.selected = false);
+            updateFolderList();
+            updateSelectedCount();
+        }
+        
+        // 更新已选择数量显示
+        function updateSelectedCount() {
+            const count = folderBrowserState.subFolders.filter(f => f.selected).length;
+            document.getElementById('selectedCount').textContent = `已选择 ${count} 个文件夹`;
+        }
+        
+        // 确认选择并扫描文件
+        async function confirmFolderSelection() {
+            const selectedFolders = folderBrowserState.subFolders.filter(f => f.selected);
+            
+            if (selectedFolders.length === 0) {
+                addLog('请至少选择一个文件夹', 'warning');
+                return;
+            }
+            
+            closeFolderBrowser();
+            
+            addLog(`开始扫描 ${selectedFolders.length} 个文件夹...`, 'info');
+            
+            const files = [];
+            
+            // 扫描所有选中的文件夹
+            for (const folder of selectedFolders) {
+                addLog(`扫描文件夹: ${folder.name}`, 'info');
+                await scanDirectoryRecursive(folder.handle, files, folder.name + '/');
+            }
+            
+            if (files.length > 0) {
+                addLog(`共找到 ${files.length} 个SRT文件`, 'success');
+                distributeFiles(files);
+            } else {
+                addLog('未找到SRT文件', 'warning');
+            }
+        }
+        
         // ==================== 第二步：文件拖放与分发系统 ====================
         
-        // 选择文件夹（推荐方式，可自动保存）
+        // 选择文件夹（推荐方式，可自动保存）- 保留旧函数作为备用
         async function selectFolderForAutoSave() {
             try {
                 const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
